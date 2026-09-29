@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正多面体の切頂 3Dシミュレーター</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans JP', 'Inter', sans-serif;
+            overflow: hidden;
+        }
+        /* カスタムスライダー */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 22px;
+            width: 22px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: transform 0.1s ease;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-screen w-screen flex flex-col md:flex-row select-none">
+
+    <!-- メイン3Dビューポート -->
+    <div class="relative flex-1 h-2/3 md:h-full w-full bg-slate-950" id="canvas-container">
+        <!-- 3D Canvas がここに挿入されます -->
+
+        <!-- オーバーレイ: 立体名バッジ -->
+        <div class="absolute top-4 left-4 z-10 bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-xl p-3.5 shadow-lg max-w-xs sm:max-w-md">
+            <span class="text-xs font-semibold text-blue-400 tracking-wider uppercase block">現在の形状</span>
+            <h1 id="polyhedron-name" class="text-xl sm:text-2xl font-bold text-white mt-0.5">正六面体 (Cube)</h1>
+            <p id="truncation-status" class="text-xs text-slate-400 mt-1">切頂なし（元の正多面体）</p>
+        </div>
+
+        <!-- ビューコントロール (リセット, 回転トグル) -->
+        <div class="absolute top-4 right-4 z-10 flex gap-2">
+            <button id="btn-auto-rotate" title="自動回転 ON/OFF" class="p-2.5 bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-xl text-slate-300 hover:text-blue-400 hover:bg-slate-800 transition shadow-sm">
+                <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+            </button>
+            <button id="btn-reset-view" title="カメラ視点をリセット" class="p-2.5 bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-xl text-slate-300 hover:text-blue-400 hover:bg-slate-800 transition shadow-sm">
+                <i data-lucide="scan" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- 凡例 (色の説明) -->
+        <div class="absolute bottom-4 left-4 z-10 flex items-center gap-4 bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-xl px-3.5 py-2 text-xs shadow-sm">
+            <div class="flex items-center gap-1.5">
+                <span class="w-3.5 h-3.5 rounded-sm bg-blue-500 inline-block"></span>
+                <span class="text-slate-300 font-medium">元の面</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <span class="w-3.5 h-3.5 rounded-sm bg-amber-400 inline-block"></span>
+                <span class="text-slate-300 font-medium">切断面 (頂点部)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- サイドバー / コントロールパネル -->
+    <div class="w-full md:w-96 h-1/3 md:h-full bg-slate-800 border-t md:border-t-0 md:border-l border-slate-700 p-4 sm:p-6 flex flex-col justify-between overflow-y-auto z-20 shadow-xl">
+        
+        <div class="space-y-5">
+            <!-- タイトル -->
+            <div class="border-b border-slate-700 pb-3">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i data-lucide="box" class="text-blue-400"></i>
+                    切頂シミュレーター
+                </h2>
+            </div>
+
+            <!-- タブ: 正多面体の選択 -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-2">１．正多面体を選択</label>
+                <div class="grid grid-cols-1 sm:grid-cols-5 md:grid-cols-1 lg:grid-cols-5 gap-1.5 bg-slate-900 p-1.5 rounded-xl border border-slate-700 shadow-sm" id="polyhedron-tabs">
+                    <button data-type="tetrahedron" class="tab-btn py-2 px-1 text-xs font-medium rounded-lg text-slate-400 hover:bg-slate-800 hover:text-blue-400 transition text-center">正四面体</button>
+                    <button data-type="cube" class="tab-btn py-2 px-1 text-xs font-medium rounded-lg bg-blue-600 text-white transition text-center shadow">正六面体</button>
+                    <button data-type="octahedron" class="tab-btn py-2 px-1 text-xs font-medium rounded-lg text-slate-400 hover:bg-slate-800 hover:text-blue-400 transition text-center">正八面体</button>
+                    <button data-type="dodecahedron" class="tab-btn py-2 px-1 text-xs font-medium rounded-lg text-slate-400 hover:bg-slate-800 hover:text-blue-400 transition text-center">正十二面体</button>
+                    <button data-type="icosahedron" class="tab-btn py-2 px-1 text-xs font-medium rounded-lg text-slate-400 hover:bg-slate-800 hover:text-blue-400 transition text-center">正二十面体</button>
+                </div>
+            </div>
+
+            <!-- 切頂スライダー -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-center">
+                    <label for="truncation-range" class="text-xs font-semibold text-slate-300">２．切頂の深さ (削る割合)</label>
+                    <span id="slider-value-text" class="text-xs font-mono font-bold text-blue-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">0.00 (0%)</span>
+                </div>
+                <input type="range" id="truncation-range" min="0" max="0.5" step="0.005" value="0" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                
+                <!-- プリセットボタン -->
+                <div class="grid grid-cols-3 gap-2 pt-1">
+                    <button id="btn-preset-0" class="text-xs py-1.5 px-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg border border-slate-600 transition font-medium shadow-sm">元の形 (0)</button>
+                    <button id="btn-preset-archimedean" class="text-xs py-1.5 px-2 bg-blue-900/60 hover:bg-blue-800/80 text-blue-300 border border-blue-700 rounded-lg transition font-semibold shadow-sm">切頂多面体 (1/3)</button>
+                    <button id="btn-preset-max" class="text-xs py-1.5 px-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg border border-slate-600 transition font-medium shadow-sm">限界 (0.5)</button>
+                </div>
+            </div>
+
+            <!-- 透過率スライダー (追加) -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-center">
+                    <label for="opacity-range" class="text-xs font-semibold text-slate-300">３．面の不透明度 (透過率)</label>
+                    <span id="opacity-value-text" class="text-xs font-mono font-bold text-blue-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">85%</span>
+                </div>
+                <input type="range" id="opacity-range" min="0.1" max="1.0" step="0.05" value="0.85" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+            </div>
+
+            <!-- リアルタイム数学データ (頂点・辺・面数) -->
+            <div class="bg-slate-900 rounded-xl p-4 border border-slate-700 shadow-sm space-y-3">
+                <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                    <span>図形の構成要素</span>
+                    <span class="text-[10px] text-blue-400 font-semibold bg-slate-800 px-2 py-0.5 rounded border border-slate-700">V - E + F = 2</span>
+                </h3>
+
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div class="bg-slate-800 p-2.5 rounded-lg border border-slate-700">
+                        <div class="text-[11px] font-medium text-slate-400">頂点の数 (V)</div>
+                        <div id="count-v" class="text-lg font-bold text-slate-100 font-mono mt-0.5">8</div>
+                    </div>
+                    <div class="bg-slate-800 p-2.5 rounded-lg border border-slate-700">
+                        <div class="text-[11px] font-medium text-slate-400">辺の数 (E)</div>
+                        <div id="count-e" class="text-lg font-bold text-slate-100 font-mono mt-0.5">12</div>
+                    </div>
+                    <div class="bg-slate-800 p-2.5 rounded-lg border border-slate-700">
+                        <div class="text-[11px] font-medium text-slate-400">面の数 (F)</div>
+                        <div id="count-f" class="text-lg font-bold text-blue-400 font-mono mt-0.5">6</div>
+                    </div>
+                </div>
+
+                <!-- 面の内訳 -->
+                <div class="pt-2 border-t border-slate-800 text-xs space-y-1.5 text-slate-300">
+                    <div class="flex justify-between items-center">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>
+                            元の面に由来する面:
+                        </span>
+                        <span id="detail-orig-faces" class="font-mono font-semibold text-slate-100">6 (正方形)</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>
+                            削られてできた面:
+                        </span>
+                        <span id="detail-cut-faces" class="font-mono font-semibold text-slate-100">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="pt-4 text-center text-[11px] text-slate-500 border-t border-slate-700 mt-4">
+            3D Polyhedron Truncation Simulator for Classroom
+        </div>
+    </div>
+
+    <script>
+        // Lucideアイコンの初期化
+        lucide.createIcons();
+
+        // -----------------------------------------------------------------
+        // 1. 正多面体の幾何データ定義 (頂点と面の構成)
+        // -----------------------------------------------------------------
+
+        // 正四面体
+        const TETRAHEDRON = {
+            name: "正四面体 (Tetrahedron)",
+            truncatedName: "切頂四面体 (Truncated Tetrahedron)",
+            maxTruncatedName: "正八面体 (Octahedron)",
+            vertices: [
+                [1, 1, 1], [-1, -1, 1], [-1, 1, -1], [1, -1, -1]
+            ],
+            faces: [
+                [0, 1, 2], [0, 3, 1], [0, 2, 3], [1, 3, 2]
+            ]
+        };
+
+        // 正六面体 (立方体)
+        const CUBE = {
+            name: "正六面体 (Cube)",
+            truncatedName: "切頂六面体 (Truncated Cube)",
+            maxTruncatedName: "正八面体 (Octahedron)",
+            vertices: [
+                [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
+                [-1, -1,  1], [1, -1,  1], [1, 1,  1], [-1, 1,  1]
+            ],
+            faces: [
+                [0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4],
+                [2, 3, 7, 6], [0, 4, 7, 3], [1, 2, 6, 5]
+            ]
+        };
+
+        // 正八面体
+        const OCTAHEDRON = {
+            name: "正八面体 (Octahedron)",
+            truncatedName: "切頂八面体 (Truncated Octahedron)",
+            maxTruncatedName: "立方八面体 (Cuboctahedron)",
+            vertices: [
+                [1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]
+            ],
+            faces: [
+                [4,0,2], [4,2,1], [4,1,3], [4,3,0],
+                [5,2,0], [5,1,2], [5,3,1], [5,0,3]
+            ]
+        };
+
+        // 黄金比 Phi
+        const PHI = (1 + Math.sqrt(5)) / 2;
+
+        // 正十二面体
+        const DODECAHEDRON = {
+            name: "正十二面体 (Dodecahedron)",
+            truncatedName: "切頂十二面体 (Truncated Dodecahedron)",
+            maxTruncatedName: "二十・十二面体 (Icosidodecahedron)",
+            vertices: [
+                // (±1, ±1, ±1)
+                [-1,-1,-1], [1,-1,-1], [1,1,-1], [-1,1,-1],
+                [-1,-1,1],  [1,-1,1],  [1,1,1],  [-1,1,1],
+                // (0, ±1/PHI, ±PHI)
+                [0, -1/PHI, -PHI], [0, 1/PHI, -PHI], [0, -1/PHI, PHI], [0, 1/PHI, PHI],
+                // (±1/PHI, ±PHI, 0)
+                [-1/PHI, -PHI, 0], [1/PHI, -PHI, 0], [-1/PHI, PHI, 0], [1/PHI, PHI, 0],
+                // (±PHI, 0, ±1/PHI)
+                [-PHI, 0, -1/PHI], [PHI, 0, -1/PHI], [-PHI, 0, 1/PHI], [PHI, 0, 1/PHI]
+            ],
+            faces: [
+                [3, 2, 9, 8, 0], [2, 1, 13, 15, 9], [1, 0, 8, 12, 13], [0, 3, 14, 16, 18], [3, 9, 15, 14, 7],
+                [4, 5, 11, 10, 6], [5, 4, 12, 13, 17], [4, 7, 18, 16, 10], [7, 6, 11, 15, 14], [6, 5, 17, 19, 11],
+                [0, 18, 16, 4, 12], [1, 2, 15, 11, 19] // 正規化された面のインデックス
+            ]
+        };
+
+        // 正十二面体の面の定義補正用関数
+        function getDodecahedronFaces() {
+            // Three.js の Standard DodecahedronGeometry から自動抽出して正確な面構造を作る
+            const geo = new THREE.DodecahedronGeometry(1.5);
+            return extractFacesFromBufferGeometry(geo);
+        }
+
+        function getIcosahedronFaces() {
+            const geo = new THREE.IcosahedronGeometry(1.5);
+            return extractFacesFromBufferGeometry(geo);
+        }
+
+        // Three.jsの標準ジオメトリから「面と頂点構造」を生成するヘルパー関数
+        function extractFacesFromBufferGeometry(geo) {
+            const posAttr = geo.attributes.position;
+            const uniqueVerts = [];
+            const precision = 100000;
+
+            function getVertIndex(x, y, z) {
+                for (let i = 0; i < uniqueVerts.length; i++) {
+                    const v = uniqueVerts[i];
+                    if (Math.abs(v[0] - x) < 0.0001 && Math.abs(v[1] - y) < 0.0001 && Math.abs(v[2] - z) < 0.0001) {
+                        return i;
+                    }
+                }
+                uniqueVerts.push([x, y, z]);
+                return uniqueVerts.length - 1;
+            }
+
+            const rawTriangles = [];
+            for (let i = 0; i < posAttr.count; i += 3) {
+                const i1 = getVertIndex(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+                const i2 = getVertIndex(posAttr.getX(i+1), posAttr.getY(i+1), posAttr.getZ(i+1));
+                const i3 = getVertIndex(posAttr.getX(i+2), posAttr.getY(i+2), posAttr.getZ(i+2));
+                rawTriangles.push([i1, i2, i3]);
+            }
+
+            // 同一平面上の三角形を結合して多角形の面を作成
+            const faces = [];
+            const visited = new Array(rawTriangles.length).fill(false);
+
+            for (let i = 0; i < rawTriangles.length; i++) {
+                if (visited[i]) continue;
+                const tri1 = rawTriangles[i];
+                const vA = new THREE.Vector3(...uniqueVerts[tri1[0]]);
+                const vB = new THREE.Vector3(...uniqueVerts[tri1[1]]);
+                const vC = new THREE.Vector3(...uniqueVerts[tri1[2]]);
+                const norm1 = new THREE.Vector3().crossVectors(vB.clone().sub(vA), vC.clone().sub(vA)).normalize();
+
+                const groupTriangles = [tri1];
+                visited[i] = true;
+
+                for (let j = i + 1; j < rawTriangles.length; j++) {
+                    if (visited[j]) continue;
+                    const tri2 = rawTriangles[j];
+                    const wA = new THREE.Vector3(...uniqueVerts[tri2[0]]);
+                    const wB = new THREE.Vector3(...uniqueVerts[tri2[1]]);
+                    const wC = new THREE.Vector3(...uniqueVerts[tri2[2]]);
+                    const norm2 = new THREE.Vector3().crossVectors(wB.clone().sub(wA), wC.clone().sub(wA)).normalize();
+
+                    if (norm1.dot(norm2) > 0.999) {
+                        groupTriangles.push(tri2);
+                        visited[j] = true;
+                    }
+                }
+
+                // 三角形の集合から多角形の輪郭を計算
+                const edgesMap = new Map();
+                groupTriangles.forEach(t => {
+                    const pairs = [[t[0], t[1]], [t[1], t[2]], [t[2], t[0]]];
+                    pairs.forEach(([a, b]) => {
+                        const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+                        if (edgesMap.has(key)) {
+                            edgesMap.delete(key);
+                        } else {
+                            edgesMap.set(key, [a, b]);
+                        }
+                    });
+                });
+
+                // 輪郭の頂点を順序よく並べる
+                const boundaryEdges = Array.from(edgesMap.values());
+                if (boundaryEdges.length > 0) {
+                    const poly = [];
+                    let current = boundaryEdges[0][0];
+                    poly.push(current);
+                    let next = boundaryEdges[0][1];
+
+                    while (next !== poly[0] && poly.length < boundaryEdges.length + 1) {
+                        poly.push(next);
+                        const nextEdge = boundaryEdges.find(e => (e[0] === next && e[1] !== current) || (e[1] === next && e[0] !== current));
+                        if (!nextEdge) break;
+                        current = next;
+                        next = nextEdge[0] === current ? nextEdge[1] : nextEdge[0];
+                    }
+                    faces.push(poly);
+                }
+            }
+
+            return { vertices: uniqueVerts, faces: faces };
+        }
+
+        // 各種基本形状の作成データ構造
+        const polyhedraData = {
+            tetrahedron: TETRAHEDRON,
+            cube: CUBE,
+            octahedron: OCTAHEDRON,
+            dodecahedron: {
+                name: "正十二面体 (Dodecahedron)",
+                truncatedName: "切頂十二面体 (Truncated Dodecahedron)",
+                maxTruncatedName: "二十・十二面体 (Icosidodecahedron)",
+                ...getDodecahedronFaces()
+            },
+            icosahedron: {
+                name: "正二十面体 (Icosahedron)",
+                truncatedName: "切頂二十面体 (Truncated Icosahedron)",
+                maxTruncatedName: "二十・十二面体 (Icosidodecahedron)",
+                ...getIcosahedronFaces()
+            }
+        };
+
+        // -----------------------------------------------------------------
+        // 2. 切頂ジオメトリ生成エンジン (Truncation Algorithm)
+        // -----------------------------------------------------------------
+        function createTruncatedPolyhedronGeometry(baseData, tRatio) {
+            // tRatio: 0.0 (切断なし) ~ 0.5 (最大切頂)
+            const origVertices = baseData.vertices.map(v => new THREE.Vector3(...v));
+            const origFaces = baseData.faces;
+
+            // 頂点に隣接する面のリスト＆隣接する頂点（辺）を解析
+            const vertNeighbors = origVertices.map(() => new Set());
+            origFaces.forEach(face => {
+                for (let i = 0; i < face.length; i++) {
+                    const v1 = face[i];
+                    const v2 = face[(i + 1) % face.length];
+                    vertNeighbors[v1].add(v2);
+                    vertNeighbors[v2].add(v1);
+                }
+            });
+
+            // 切頂された新しい3Dメッシュの作成
+            const group = new THREE.Group();
+
+            // 新しい頂点のマップ: (元の頂点i, 隣接頂点j) -> 新しい頂点Vector3
+            const newVertsMap = new Map();
+
+            origVertices.forEach((V_i, i) => {
+                vertNeighbors[i].forEach(j => {
+                    const V_j = origVertices[j];
+                    // iからjへの方向に tRatio だけ進んだ位置
+                    const newV = new THREE.Vector3().lerpVectors(V_i, V_j, tRatio);
+                    newVertsMap.set(`${i}_${j}`, newV);
+                });
+            });
+
+            // --- 1. 元の面を削った新しい面を作成 (Blue Material) ---
+            const origFaceGroup = new THREE.Group();
+            const blueMaterial = new THREE.MeshPhongMaterial({
+                color: 0x3b82f6,
+                shininess: 80,
+                side: THREE.DoubleSide,
+                flatShading: true,
+                transparent: currentOpacity < 0.99,
+                opacity: currentOpacity,
+                depthWrite: currentOpacity > 0.8
+            });
+
+            origFaces.forEach(face => {
+                const faceVertices = [];
+                for (let k = 0; k < face.length; k++) {
+                    const curr = face[k];
+                    const prev = face[(k - 1 + face.length) % face.length];
+                    const next = face[(k + 1) % face.length];
+
+                    if (tRatio > 0) {
+                        // 頂点currは2つの新頂点に置き換わる
+                        faceVertices.push(newVertsMap.get(`${curr}_${prev}`));
+                        faceVertices.push(newVertsMap.get(`${curr}_${next}`));
+                    } else {
+                        faceVertices.push(origVertices[curr]);
+                    }
+                }
+
+                if (faceVertices.length >= 3) {
+                    const shapeGeo = createPolygonGeometry(faceVertices);
+                    const mesh = new THREE.Mesh(shapeGeo, blueMaterial);
+                    origFaceGroup.add(mesh);
+                }
+            });
+
+            group.add(origFaceGroup);
+
+            // --- 2. 削られた頂点部分に新しくできる面を作成 (Amber Material) ---
+            const cutFaceGroup = new THREE.Group();
+            const amberMaterial = new THREE.MeshPhongMaterial({
+                color: 0xf59e0b,
+                shininess: 90,
+                side: THREE.DoubleSide,
+                flatShading: true,
+                transparent: currentOpacity < 0.99,
+                opacity: currentOpacity,
+                depthWrite: currentOpacity > 0.8
+            });
+
+            if (tRatio > 0) {
+                origVertices.forEach((V_i, i) => {
+                    const neighborArr = Array.from(vertNeighbors[i]);
+                    const center = V_i;
+                    const normal = V_i.clone().normalize();
+                    
+                    const v0 = newVertsMap.get(`${i}_${neighborArr[0]}`).clone().sub(center);
+                    const refX = v0.clone().projectOnPlane(normal).normalize();
+                    const refY = new THREE.Vector3().crossVectors(normal, refX).normalize();
+
+                    neighborArr.sort((a, b) => {
+                        const posA = newVertsMap.get(`${i}_${a}`).clone().sub(center);
+                        const posB = newVertsMap.get(`${i}_${b}`).clone().sub(center);
+                        const angleA = Math.atan2(posA.dot(refY), posA.dot(refX));
+                        const angleB = Math.atan2(posB.dot(refY), posB.dot(refX));
+                        return angleA - angleB;
+                    });
+
+                    const cutVerts = neighborArr.map(j => newVertsMap.get(`${i}_${j}`));
+                    if (cutVerts.length >= 3) {
+                        const shapeGeo = createPolygonGeometry(cutVerts);
+                        const mesh = new THREE.Mesh(shapeGeo, amberMaterial);
+                        cutFaceGroup.add(mesh);
+                    }
+                });
+            }
+
+            group.add(cutFaceGroup);
+
+            // --- 3. エッジ（ワイヤーフレーム/枠線）の追加 ---
+            const wireframeGroup = new THREE.Group();
+            const lineMaterial = new THREE.LineBasicMaterial({ color: 0xe2e8f0, linewidth: 2 });
+
+            group.children.forEach(subGroup => {
+                subGroup.children.forEach(mesh => {
+                    const edges = new THREE.EdgesGeometry(mesh.geometry);
+                    const line = new THREE.LineSegments(edges, lineMaterial);
+                    wireframeGroup.add(line);
+                });
+            });
+
+            group.add(wireframeGroup);
+
+            return { group, baseData };
+        }
+
+        // 3D空間内の任意の多角形頂点配列からGeometryを作成
+        function createPolygonGeometry(vertices) {
+            const geometry = new THREE.BufferGeometry();
+            
+            // 重心を求める
+            const center = new THREE.Vector3();
+            vertices.forEach(v => center.add(v));
+            center.divideScalar(vertices.length);
+
+            // 扇形分解（Triangle Fan）でインデックスと頂点を設定
+            const positions = [];
+            const normals = [];
+
+            // 面の法線ベクトル
+            const v0 = vertices[0];
+            const v1 = vertices[1];
+            const v2 = vertices[2];
+            const norm = new THREE.Vector3().crossVectors(
+                v1.clone().sub(v0),
+                v2.clone().sub(v0)
+            ).normalize();
+
+            // 中心から外側に向かう法線判定（外向きに修正）
+            if (norm.dot(center) < 0) {
+                norm.negate();
+            }
+
+            for (let i = 0; i < vertices.length; i++) {
+                const next = (i + 1) % vertices.length;
+                
+                positions.push(center.x, center.y, center.z);
+                positions.push(vertices[i].x, vertices[i].y, vertices[i].z);
+                positions.push(vertices[next].x, vertices[next].y, vertices[next].z);
+
+                for(let k=0; k<3; k++) {
+                    normals.push(norm.x, norm.y, norm.z);
+                }
+            }
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+            return geometry;
+        }
+
+        // -----------------------------------------------------------------
+        // 3. Three.js アプリケーション環境構築
+        // -----------------------------------------------------------------
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a); // 落ち着いたダークスレート背景
+
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(0, 2.5, 5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.autoRotateSpeed = 1.2;
+
+        // ライティング
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+        scene.add(ambientLight);
+
+        const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.9);
+        dirLight1.position.set(5, 10, 7);
+        scene.add(dirLight1);
+
+        const dirLight2 = new THREE.DirectionalLight(0x60a5fa, 0.5);
+        dirLight2.position.set(-5, -5, -5);
+        scene.add(dirLight2);
+
+        // 現在の表示状態変数
+        let currentType = 'cube';
+        let currentTRatio = 0.0;
+        let currentOpacity = 0.85;
+        let currentPolyhedronGroup = null;
+
+        function getOrigFaceShapeName(type, tRatio) {
+            if (tRatio === 0 || tRatio === 0.5) {
+                if (type === 'tetrahedron' || type === 'octahedron' || type === 'icosahedron') return '正三角形';
+                if (type === 'cube') return '正方形';
+                if (type === 'dodecahedron') return '正五角形';
+            } else {
+                if (type === 'tetrahedron' || type === 'octahedron' || type === 'icosahedron') return '正六角形';
+                if (type === 'cube') return '正八角形';
+                if (type === 'dodecahedron') return '正十角形';
+            }
+            return '';
+        }
+
+        function getCutFaceShapeName(type) {
+            if (type === 'tetrahedron' || type === 'cube' || type === 'dodecahedron') return '正三角形';
+            if (type === 'octahedron') return '正方形';
+            if (type === 'icosahedron') return '正五角形';
+            return '';
+        }
+
+        function updateModel() {
+            const baseData = polyhedraData[currentType];
+            if (!baseData) return;
+
+            // 既存の3Dオブジェクトを消去・メモリ解放
+            if (currentPolyhedronGroup) {
+                scene.remove(currentPolyhedronGroup);
+                currentPolyhedronGroup.traverse((child) => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) {
+                        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                        else child.material.dispose();
+                    }
+                });
+            }
+
+            // 新しい切り取りモデルを生成して追加
+            const result = createTruncatedPolyhedronGeometry(baseData, currentTRatio);
+            currentPolyhedronGroup = result.group;
+            scene.add(currentPolyhedronGroup);
+
+            // 要素数 (V, E, F) の動的計算
+            const V0 = baseData.vertices.length;
+            const F0 = baseData.faces.length;
+            const E0 = V0 + F0 - 2;
+
+            let currentV, currentE, currentF, origFaceCount, cutFaceCount;
+            let statusText = "";
+            let nameText = "";
+
+            if (currentTRatio === 0) {
+                nameText = baseData.name;
+                statusText = "切頂なし（元の正多面体）";
+                currentV = V0;
+                currentE = E0;
+                currentF = F0;
+                origFaceCount = F0;
+                cutFaceCount = 0;
+            } else if (currentTRatio === 0.5) {
+                nameText = baseData.maxTruncatedName;
+                statusText = "限界切頂 (完全切頂)";
+                currentV = E0;
+                currentE = 2 * E0;
+                currentF = F0 + V0;
+                origFaceCount = F0;
+                cutFaceCount = V0;
+            } else {
+                nameText = baseData.truncatedName;
+                const percent = Math.round((currentTRatio / 0.5) * 100);
+                statusText = `切頂中 (削り具合: ${percent}%)`;
+                currentV = 2 * E0;
+                currentE = 3 * E0;
+                currentF = F0 + V0;
+                origFaceCount = F0;
+                cutFaceCount = V0;
+            }
+
+            // UI要素の更新
+            document.getElementById('polyhedron-name').textContent = nameText;
+            document.getElementById('truncation-status').textContent = statusText;
+            document.getElementById('slider-value-text').textContent = `${currentTRatio.toFixed(3)} (${Math.round(currentTRatio * 200)}%)`;
+
+            document.getElementById('count-v').textContent = currentV;
+            document.getElementById('count-e').textContent = currentE;
+            document.getElementById('count-f').textContent = currentF;
+
+            const origFaceShape = getOrigFaceShapeName(currentType, currentTRatio);
+            const cutFaceShape = getCutFaceShapeName(currentType);
+
+            document.getElementById('detail-orig-faces').textContent = `${origFaceCount} (${origFaceShape})`;
+            document.getElementById('detail-cut-faces').textContent = cutFaceCount > 0 ? `${cutFaceCount} (${cutFaceShape})` : "0";
+
+            // タブの選択状態スタイル更新
+            const tabButtons = document.querySelectorAll('#polyhedron-tabs button');
+            tabButtons.forEach(btn => {
+                if (btn.getAttribute('data-type') === currentType) {
+                    btn.className = "tab-btn py-2 px-1 text-xs font-medium rounded-lg bg-blue-600 text-white transition text-center shadow";
+                } else {
+                    btn.className = "tab-btn py-2 px-1 text-xs font-medium rounded-lg text-slate-400 hover:bg-slate-800 hover:text-blue-400 transition text-center";
+                }
+            });
+        }
+
+        // 1. タブ切り替え操作
+        document.getElementById('polyhedron-tabs').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-type]');
+            if (btn) {
+                currentType = btn.getAttribute('data-type');
+                updateModel();
+            }
+        });
+
+        // 2. スライダー操作 (切頂)
+        const rangeInput = document.getElementById('truncation-range');
+        rangeInput.addEventListener('input', (e) => {
+            currentTRatio = parseFloat(e.target.value);
+            updateModel();
+        });
+
+        // 2.5 スライダー操作 (透過率)
+        const opacityInput = document.getElementById('opacity-range');
+        opacityInput.addEventListener('input', (e) => {
+            currentOpacity = parseFloat(e.target.value);
+            document.getElementById('opacity-value-text').textContent = `${Math.round(currentOpacity * 100)}%`;
+            updateModel();
+        });
+
+        // 3. プリセットボタン
+        document.getElementById('btn-preset-0').addEventListener('click', () => {
+            currentTRatio = 0.0;
+            rangeInput.value = 0.0;
+            updateModel();
+        });
+        document.getElementById('btn-preset-archimedean').addEventListener('click', () => {
+            currentTRatio = 1 / 3;
+            rangeInput.value = 1 / 3;
+            updateModel();
+        });
+        document.getElementById('btn-preset-max').addEventListener('click', () => {
+            currentTRatio = 0.5;
+            rangeInput.value = 0.5;
+            updateModel();
+        });
+
+        // 4. ビューコントロールボタン
+        document.getElementById('btn-auto-rotate').addEventListener('click', function() {
+            controls.autoRotate = !controls.autoRotate;
+            this.classList.toggle('bg-blue-600/30');
+            this.classList.toggle('text-blue-400');
+        });
+
+        document.getElementById('btn-reset-view').addEventListener('click', () => {
+            camera.position.set(0, 2.5, 5);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        });
+
+        // ウィンドウリサイズ対応
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        // 初期表示実行
+        updateModel();
+
+        // アニメーションループ
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function() {
+            animate();
+        };
+
+    </script>
+</body>
+</html>

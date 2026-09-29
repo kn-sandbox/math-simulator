@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多面体の平面切断 3Dシミュレーター</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans JP', 'Inter', sans-serif;
+            overflow: hidden;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        /* Slider Thumb Styling */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            transition: transform 0.1s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-screen w-screen flex flex-col md:flex-row select-none">
+
+    <!-- メイン3Dビューポート -->
+    <div class="relative flex-1 h-3/5 md:h-full w-full bg-slate-950" id="canvas-container">
+        
+        <!-- ビューコントロール (リセット, 自動回転) -->
+        <div class="absolute top-4 right-4 z-10 flex gap-2">
+            <button id="btn-auto-rotate" title="自動回転 ON/OFF" class="p-2.5 bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-xl text-slate-300 hover:text-blue-400 hover:bg-slate-800 transition shadow-md">
+                <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+            </button>
+            <button id="btn-reset-view" title="カメラ視点をリセット" class="p-2.5 bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-xl text-slate-300 hover:text-blue-400 hover:bg-slate-800 transition shadow-md">
+                <i data-lucide="scan" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- 凡例 (色のガイド) -->
+        <div class="absolute bottom-4 left-4 z-10 flex items-center gap-4 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-3.5 py-2 text-xs shadow-md">
+            <div class="flex items-center gap-1.5">
+                <span class="w-3.5 h-3.5 rounded bg-amber-400 inline-block shadow-sm"></span>
+                <span class="text-slate-200 font-semibold">切断面</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <span class="w-3.5 h-3.5 rounded bg-blue-500/60 border border-blue-400 inline-block"></span>
+                <span class="text-slate-300">立体</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <span class="w-3.5 h-3.5 rounded bg-emerald-500/30 border border-emerald-400 inline-block"></span>
+                <span class="text-slate-300">切断平面</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- サイドバー / コントロールパネル -->
+    <div class="w-full md:w-96 h-2/5 md:h-full bg-slate-800 border-t md:border-t-0 md:border-l border-slate-700 p-4 sm:p-5 flex flex-col justify-between overflow-y-auto z-20 shadow-2xl">
+        
+        <div class="space-y-4">
+            <!-- タイトル -->
+            <div class="border-b border-slate-700 pb-2.5">
+                <h2 class="text-base font-bold text-white flex items-center gap-2">
+                    <i data-lucide="scissors" class="text-amber-400 w-5 h-5"></i>
+                    多面体の平面切断 3D
+                </h2>
+            </div>
+
+            <!-- 1. 正多面体を選択 -->
+            <div>
+                <label class="block text-xs font-bold text-slate-300 mb-1.5">１．正多面体を選択</label>
+                <div class="grid grid-cols-5 gap-1 bg-slate-900 p-1.5 rounded-xl border border-slate-700 shadow-inner" id="polyhedron-tabs">
+                    <button data-type="tetrahedron" class="tab-btn py-2 px-1 text-xs font-medium rounded-lg text-slate-400 hover:bg-slate-800 hover:text-blue-400 transition text-center">正4面</button>
+                    <button data-type="cube" class="tab-btn py-2 px-1 text-xs font-medium rounded-lg bg-blue-600 text-white transition text-center shadow">正6面</button>
+                    <button data-type="octahedron" class="tab-btn py-2 px-1 text-xs font-medium rounded-lg text-slate-400 hover:bg-slate-800 hover:text-blue-400 transition text-center">正8面</button>
+                    <button data-type="dodecahedron" class="tab-btn py-2 px-1 text-xs font-medium rounded-lg text-slate-400 hover:bg-slate-800 hover:text-blue-400 transition text-center">正12面</button>
+                    <button data-type="icosahedron" class="tab-btn py-2 px-1 text-xs font-medium rounded-lg text-slate-400 hover:bg-slate-800 hover:text-blue-400 transition text-center">正20面</button>
+                </div>
+            </div>
+
+            <!-- 2. 切断平面のコントロール -->
+            <div class="space-y-3 bg-slate-900/70 p-3 rounded-xl border border-slate-700">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-1.5">
+                    <label class="block text-xs font-bold text-blue-400 uppercase tracking-wider">２．切断平面の操作 (微調整付き)</label>
+                    <button id="btn-align-center" class="text-[11px] text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded border border-slate-700 transition">中心にリセット</button>
+                </div>
+                
+                <!-- 位置（距離） -->
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-300">平面位置 (中心からの距離)</span>
+                        <span id="plane-dist-val" class="font-mono text-blue-400 font-bold">0.00</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button class="step-btn text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2 py-0.5 rounded font-mono text-slate-300" data-target="plane-dist" data-step="-0.05">-0.05</button>
+                        <input type="range" id="plane-dist" min="-1.5" max="1.5" step="0.01" value="0" class="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                        <button class="step-btn text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2 py-0.5 rounded font-mono text-slate-300" data-target="plane-dist" data-step="0.05">+0.05</button>
+                    </div>
+                </div>
+
+                <!-- 傾き X (Pitch) -->
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-300">傾き (Z軸からの角度 θ)</span>
+                        <span id="plane-rotx-val" class="font-mono text-blue-400 font-bold">54.7°</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button class="step-btn text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2 py-0.5 rounded font-mono text-slate-300" data-target="plane-rotx" data-step="-1">-1°</button>
+                        <input type="range" id="plane-rotx" min="0" max="180" step="0.1" value="54.7" class="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                        <button class="step-btn text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2 py-0.5 rounded font-mono text-slate-300" data-target="plane-rotx" data-step="1">+1°</button>
+                    </div>
+                </div>
+
+                <!-- 傾き Y (Yaw/Roll) -->
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-300">方位 (XY平面での回転 φ)</span>
+                        <span id="plane-roty-val" class="font-mono text-blue-400 font-bold">45.0°</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button class="step-btn text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2 py-0.5 rounded font-mono text-slate-300" data-target="plane-roty" data-step="-180" data-step="-1">-1°</button>
+                        <input type="range" id="plane-roty" min="-180" max="180" step="0.1" value="45" class="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                        <button class="step-btn text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2 py-0.5 rounded font-mono text-slate-300" data-target="plane-roty" data-step="1">+1°</button>
+                    </div>
+                </div>
+
+                <!-- 角度クイックリセット -->
+                <div class="pt-1 flex gap-1.5 text-[11px]">
+                    <span class="text-slate-400 self-center">視点方向:</span>
+                    <button id="btn-axis-z" class="flex-1 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300">上面 (Z軸)</button>
+                    <button id="btn-axis-y" class="flex-1 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300">正面 (Y軸)</button>
+                    <button id="btn-axis-x" class="flex-1 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300">側面 (X軸)</button>
+                </div>
+            </div>
+
+            <!-- 3. 表示オプション -->
+            <div class="space-y-2 bg-slate-900/70 p-3 rounded-xl border border-slate-700">
+                <label class="block text-xs font-bold text-slate-300">３．表示オプション</label>
+                
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <label class="flex items-center gap-2 cursor-pointer bg-slate-800 p-2 rounded-lg border border-slate-700 text-slate-300 hover:text-white">
+                        <input type="checkbox" id="chk-show-plane" checked class="rounded accent-blue-500 w-4 h-4">
+                        切断平面を表示
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer bg-slate-800 p-2 rounded-lg border border-slate-700 text-slate-300 hover:text-white">
+                        <input type="checkbox" id="chk-show-upper" checked class="rounded accent-blue-500 w-4 h-4">
+                        上半分の立体を表示
+                    </label>
+                </div>
+
+                <!-- 不透明度 -->
+                <div class="space-y-1 pt-1">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-300">立体の不透明度</span>
+                        <span id="opacity-val" class="font-mono text-blue-400 font-semibold">65%</span>
+                    </div>
+                    <input type="range" id="poly-opacity" min="0.1" max="1.0" step="0.05" value="0.65" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                </div>
+            </div>
+
+        </div>
+
+        <div class="pt-3 text-center text-[11px] text-slate-500 border-t border-slate-700 mt-3">
+            3D Polyhedron Cross-Section Interactive Simulator
+        </div>
+    </div>
+
+    <script>
+        // Lucideアイコン初期化
+        lucide.createIcons();
+
+        // -----------------------------------------------------------------
+        // 1. 各正多面体の定義データ (正確な幾何形状)
+        // -----------------------------------------------------------------
+        function getPolyhedronData(type) {
+            let geo;
+            const size = 1.35;
+            switch(type) {
+                case 'tetrahedron':
+                    geo = new THREE.TetrahedronGeometry(size);
+                    break;
+                case 'cube':
+                    geo = new THREE.BoxGeometry(size * 1.2, size * 1.2, size * 1.2);
+                    break;
+                case 'octahedron':
+                    geo = new THREE.OctahedronGeometry(size);
+                    break;
+                case 'dodecahedron':
+                    geo = new THREE.DodecahedronGeometry(size * 0.95);
+                    break;
+                case 'icosahedron':
+                    geo = new THREE.IcosahedronGeometry(size * 0.95);
+                    break;
+                default:
+                    geo = new THREE.BoxGeometry(size, size, size);
+            }
+
+            const pos = geo.attributes.position;
+            const vertices = [];
+
+            function getVertIndex(x, y, z) {
+                for (let i = 0; i < vertices.length; i++) {
+                    const v = vertices[i];
+                    if (Math.abs(v.x - x) < 0.0005 && Math.abs(v.y - y) < 0.0005 && Math.abs(v.z - z) < 0.0005) {
+                        return i;
+                    }
+                }
+                vertices.push(new THREE.Vector3(x, y, z));
+                return vertices.length - 1;
+            }
+
+            const edgesMap = new Set();
+            const edges = [];
+
+            function addEdge(a, b) {
+                if (a === b) return;
+                const key = a < b ? `${a}_${b}` : `${b}_${a}`;
+                if (!edgesMap.has(key)) {
+                    edgesMap.add(key);
+                    edges.push([a, b]);
+                }
+            }
+
+            if (geo.index) {
+                const idx = geo.index;
+                for (let i = 0; i < idx.count; i += 3) {
+                    const i1 = getVertIndex(pos.getX(idx.getX(i)), pos.getY(idx.getX(i)), pos.getZ(idx.getX(i)));
+                    const i2 = getVertIndex(pos.getX(idx.getX(i+1)), pos.getY(idx.getX(i+1)), pos.getZ(idx.getX(i+1)));
+                    const i3 = getVertIndex(pos.getX(idx.getX(i+2)), pos.getY(idx.getX(i+2)), pos.getZ(idx.getX(i+2)));
+                    addEdge(i1, i2); addEdge(i2, i3); addEdge(i3, i1);
+                }
+            } else {
+                for (let i = 0; i < pos.count; i += 3) {
+                    const i1 = getVertIndex(pos.getX(i), pos.getY(i), pos.getZ(i));
+                    const i2 = getVertIndex(pos.getX(i+1), pos.getY(i+1), pos.getZ(i+1));
+                    const i3 = getVertIndex(pos.getX(i+2), pos.getY(i+2), pos.getZ(i+2));
+                    addEdge(i1, i2); addEdge(i2, i3); addEdge(i3, i1);
+                }
+            }
+
+            return { vertices, edges, rawGeometry: geo };
+        }
+
+        const polyNames = {
+            tetrahedron: "正四面体",
+            cube: "正六面体 (立方体)",
+            octahedron: "正八面体",
+            dodecahedron: "正十二面体",
+            icosahedron: "正二十面体"
+        };
+
+        // -----------------------------------------------------------------
+        // 2. 精密切断計算エンジン & 正多角形判定
+        // -----------------------------------------------------------------
+        function computeCrossSection(polyData, plane) {
+            const vertices = polyData.vertices;
+            const edges = polyData.edges;
+
+            const intersections = [];
+            const EPSILON = 0.0001;
+
+            edges.forEach(([iA, iB]) => {
+                const vA = vertices[iA];
+                const vB = vertices[iB];
+
+                const distA = plane.distanceToPoint(vA);
+                const distB = plane.distanceToPoint(vB);
+
+                if (distA * distB < -1e-7) {
+                    const t = Math.abs(distA) / (Math.abs(distA) + Math.abs(distB));
+                    const pIntersect = new THREE.Vector3().lerpVectors(vA, vB, t);
+                    
+                    if (!intersections.some(pt => pt.distanceTo(pIntersect) < EPSILON)) {
+                        intersections.push(pIntersect);
+                    }
+                } else if (Math.abs(distA) < EPSILON) {
+                    if (!intersections.some(pt => pt.distanceTo(vA) < EPSILON)) {
+                        intersections.push(vA.clone());
+                    }
+                }
+            });
+
+            if (intersections.length < 3) return null;
+
+            // 平面上の凸多角形頂点ソート
+            const center = new THREE.Vector3();
+            intersections.forEach(p => center.add(p));
+            center.divideScalar(intersections.length);
+
+            const normal = plane.normal.clone().normalize();
+            
+            let uAxis = new THREE.Vector3();
+            if (Math.abs(normal.x) > 0.9) {
+                uAxis.crossVectors(normal, new THREE.Vector3(0, 1, 0)).normalize();
+            } else {
+                uAxis.crossVectors(normal, new THREE.Vector3(1, 0, 0)).normalize();
+            }
+            let vAxis = new THREE.Vector3().crossVectors(normal, uAxis).normalize();
+
+            const sortedVerts = intersections.map(p => {
+                const rel = p.clone().sub(center);
+                const x = rel.dot(uAxis);
+                const y = rel.dot(vAxis);
+                return { point: p, angle: Math.atan2(y, x) };
+            }).sort((a, b) => a.angle - b.angle).map(item => item.point);
+
+            return {
+                vertices: sortedVerts,
+                center: center,
+                normal: normal,
+                count: sortedVerts.length
+            };
+        }
+
+        // -----------------------------------------------------------------
+        // 3. Three.js アプリケーション構築
+        // -----------------------------------------------------------------
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020617); // Slate 950
+
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(3.0, 2.3, 4.0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // 照明
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+        scene.add(ambientLight);
+
+        const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight1.position.set(5, 10, 7);
+        scene.add(dirLight1);
+
+        const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.4);
+        dirLight2.position.set(-5, -5, -5);
+        scene.add(dirLight2);
+
+        // オブジェクト保持コンテナ
+        const mainGroup = new THREE.Group();
+        scene.add(mainGroup);
+
+        // 状態変数
+        let currentType = 'cube';
+        let currentDist = 0.0;
+        let currentRotX = 54.7;
+        let currentRotY = 45.0;
+        let currentOpacity = 0.65;
+        let showPlane = true;
+        let showUpper = true;
+
+        let polyhedronData = getPolyhedronData(currentType);
+
+        // 切断平面のVisual Mesh
+        const planeGeo = new THREE.PlaneGeometry(3.6, 3.6);
+        const planeMat = new THREE.MeshPhongMaterial({
+            color: 0x10b981,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.25,
+            depthWrite: false
+        });
+        const planeMesh = new THREE.Mesh(planeGeo, planeMat);
+        const planeEdges = new THREE.EdgesGeometry(planeGeo);
+        const planeLineMat = new THREE.LineBasicMaterial({ color: 0x34d399, linewidth: 2 });
+        const planeLine = new THREE.LineSegments(planeEdges, planeLineMat);
+        planeMesh.add(planeLine);
+        scene.add(planeMesh);
+
+        // -----------------------------------------------------------------
+        // 5. 描画更新処理
+        // -----------------------------------------------------------------
+        function updateScene() {
+            // メッシュのクリア
+            while(mainGroup.children.length > 0){ 
+                const obj = mainGroup.children[0];
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) {
+                    if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+                    else obj.material.dispose();
+                }
+                mainGroup.remove(obj); 
+            }
+
+            // 平面法線（球面座標系: θ=仰角, φ=方位角）
+            const thetaRad = THREE.MathUtils.degToRad(currentRotX);
+            const phiRad = THREE.MathUtils.degToRad(currentRotY);
+
+            const normal = new THREE.Vector3(
+                Math.sin(thetaRad) * Math.cos(phiRad),
+                Math.sin(thetaRad) * Math.sin(phiRad),
+                Math.cos(thetaRad)
+            ).normalize();
+            
+            const planePos = normal.clone().multiplyScalar(currentDist);
+            planeMesh.position.copy(planePos);
+            planeMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+            planeMesh.visible = showPlane;
+
+            const slicePlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, planePos);
+
+            // 断面ポリゴン計算
+            const section = computeCrossSection(polyhedronData, slicePlane);
+
+            if (section) {
+                // 断面3Dメッシュ
+                const sectionGeo = new THREE.BufferGeometry();
+                const posArr = [];
+                const normArr = [];
+
+                for (let i = 0; i < section.vertices.length; i++) {
+                    const next = (i + 1) % section.vertices.length;
+                    posArr.push(section.center.x, section.center.y, section.center.z);
+                    posArr.push(section.vertices[i].x, section.vertices[i].y, section.vertices[i].z);
+                    posArr.push(section.vertices[next].x, section.vertices[next].y, section.vertices[next].z);
+
+                    for (let k = 0; k < 3; k++) {
+                        normArr.push(section.normal.x, section.normal.y, section.normal.z);
+                    }
+                }
+
+                sectionGeo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+                sectionGeo.setAttribute('normal', new THREE.Float32BufferAttribute(normArr, 3));
+
+                const sectionMat = new THREE.MeshPhongMaterial({
+                    color: 0xf59e0b,
+                    emissive: 0x78350f,
+                    side: THREE.DoubleSide,
+                    shininess: 100
+                });
+                const sectionMesh = new THREE.Mesh(sectionGeo, sectionMat);
+                mainGroup.add(sectionMesh);
+
+                // 黄色く輝く境界線
+                const linePositions = [];
+                section.vertices.forEach(v => linePositions.push(v.x, v.y, v.z));
+                linePositions.push(section.vertices[0].x, section.vertices[0].y, section.vertices[0].z);
+
+                const lineGeo = new THREE.BufferGeometry();
+                lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+                const lineMat = new THREE.LineBasicMaterial({ color: 0xfef08a, linewidth: 3 });
+                const sectionOutline = new THREE.Line(lineGeo, lineMat);
+                mainGroup.add(sectionOutline);
+            }
+
+            // 立体本体の描画（クリッピング対応）
+            const polyMat = new THREE.MeshPhongMaterial({
+                color: 0x3b82f6,
+                transparent: true,
+                opacity: currentOpacity,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+
+            if (showUpper) {
+                const polyMesh = new THREE.Mesh(polyhedronData.rawGeometry, polyMat);
+                mainGroup.add(polyMesh);
+            } else {
+                const clipPlane = slicePlane.clone().negate();
+                const clippedMat = polyMat.clone();
+                renderer.localClippingEnabled = true;
+                clippedMat.clippingPlanes = [clipPlane];
+
+                const polyMesh = new THREE.Mesh(polyhedronData.rawGeometry, clippedMat);
+                mainGroup.add(polyMesh);
+            }
+
+            // ワイヤーフレーム枠線
+            const edgesGeo = new THREE.EdgesGeometry(polyhedronData.rawGeometry);
+            const edgesMat = new THREE.LineBasicMaterial({ color: 0x93c5fd, linewidth: 1.5 });
+            const edgesMesh = new THREE.LineSegments(edgesGeo, edgesMat);
+            mainGroup.add(edgesMesh);
+        }
+
+        // -----------------------------------------------------------------
+        // 6. UI操作イベント
+        // -----------------------------------------------------------------
+        function applyPlaneSettings(dist, rotX, rotY) {
+            currentDist = dist;
+            currentRotX = rotX;
+            currentRotY = rotY;
+
+            document.getElementById('plane-dist').value = dist;
+            document.getElementById('plane-rotx').value = rotX;
+            document.getElementById('plane-roty').value = rotY;
+
+            document.getElementById('plane-dist-val').textContent = dist.toFixed(2);
+            document.getElementById('plane-rotx-val').textContent = `${rotX.toFixed(1)}°`;
+            document.getElementById('plane-roty-val').textContent = `${rotY.toFixed(1)}°`;
+
+            updateScene();
+        }
+
+        // 多面体タブ切り替え
+        document.getElementById('polyhedron-tabs').addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-type]');
+            if (btn) {
+                currentType = btn.getAttribute('data-type');
+                polyhedronData = getPolyhedronData(currentType);
+
+                document.querySelectorAll('#polyhedron-tabs button').forEach(b => {
+                    if (b.getAttribute('data-type') === currentType) {
+                        b.className = "tab-btn py-2 px-1 text-xs font-medium rounded-lg bg-blue-600 text-white transition text-center shadow";
+                    } else {
+                        b.className = "tab-btn py-2 px-1 text-xs font-medium rounded-lg text-slate-400 hover:bg-slate-800 hover:text-blue-400 transition text-center";
+                    }
+                });
+
+                updateScene();
+            }
+        });
+
+        // スライダー連動
+        const distSlider = document.getElementById('plane-dist');
+        const rotXSlider = document.getElementById('plane-rotx');
+        const rotYSlider = document.getElementById('plane-roty');
+        const opacitySlider = document.getElementById('poly-opacity');
+
+        distSlider.addEventListener('input', (e) => {
+            currentDist = parseFloat(e.target.value);
+            document.getElementById('plane-dist-val').textContent = currentDist.toFixed(2);
+            updateScene();
+        });
+
+        rotXSlider.addEventListener('input', (e) => {
+            currentRotX = parseFloat(e.target.value);
+            document.getElementById('plane-rotx-val').textContent = `${currentRotX.toFixed(1)}°`;
+            updateScene();
+        });
+
+        rotYSlider.addEventListener('input', (e) => {
+            currentRotY = parseFloat(e.target.value);
+            document.getElementById('plane-roty-val').textContent = `${currentRotY.toFixed(1)}°`;
+            updateScene();
+        });
+
+        opacitySlider.addEventListener('input', (e) => {
+            currentOpacity = parseFloat(e.target.value);
+            document.getElementById('opacity-val').textContent = `${Math.round(currentOpacity * 100)}%`;
+            updateScene();
+        });
+
+        // Step 微調整ボタンイベント
+        document.querySelectorAll('.step-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.getAttribute('data-target');
+                const step = parseFloat(btn.getAttribute('data-step'));
+                const input = document.getElementById(targetId);
+
+                let val = parseFloat(input.value) + step;
+                val = Math.max(parseFloat(input.min), Math.min(parseFloat(input.max), val));
+                input.value = val;
+
+                // イベント手動発火
+                input.dispatchEvent(new Event('input'));
+            });
+        });
+
+        // クイック軸リセット
+        document.getElementById('btn-axis-z').addEventListener('click', () => applyPlaneSettings(currentDist, 0, 0));
+        document.getElementById('btn-axis-y').addEventListener('click', () => applyPlaneSettings(currentDist, 90, 90));
+        document.getElementById('btn-axis-x').addEventListener('click', () => applyPlaneSettings(currentDist, 90, 0));
+        document.getElementById('btn-align-center').addEventListener('click', () => applyPlaneSettings(0.0, currentRotX, currentRotY));
+
+        // 表示トグル
+        document.getElementById('chk-show-plane').addEventListener('change', (e) => {
+            showPlane = e.target.checked;
+            updateScene();
+        });
+
+        document.getElementById('chk-show-upper').addEventListener('change', (e) => {
+            showUpper = e.target.checked;
+            updateScene();
+        });
+
+        // ビューコントロールボタン
+        document.getElementById('btn-auto-rotate').addEventListener('click', function() {
+            controls.autoRotate = !controls.autoRotate;
+            this.classList.toggle('bg-blue-600/30');
+            this.classList.toggle('text-blue-400');
+        });
+
+        document.getElementById('btn-reset-view').addEventListener('click', () => {
+            camera.position.set(3.0, 2.3, 4.0);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        });
+
+        // ウィンドウリサイズ
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        // 初回ロード時実行
+        updateScene();
+
+        // アニメーションループ
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function() {
+            animate();
+        };
+
+    </script>
+</body>
+</html>

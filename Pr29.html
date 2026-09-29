@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>y = sin x + sin 2x + sin 3x + sin 4x 視覚化シミュレーター</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- MathJax for rendering math formulas -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            font-family: 'Noto Sans JP', 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom range slider thumb */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+            transition: transform 0.1s ease, background-color 0.1s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.25);
+            background: #7dd3fc;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col select-none overflow-hidden">
+
+    <!-- ヘッダー -->
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="p-2 bg-sky-500/10 border border-sky-500/30 rounded-xl text-sky-400">
+                <i data-lucide="activity" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <h1 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    三角関数の和と単位円の視覚化
+                </h1>
+                <p class="text-xs text-slate-400">
+                    \( y = \sin x + \sin 2x + \sin 3x + \sin 4x \) のグラフと単位円の連動
+                </p>
+            </div>
+        </div>
+
+        <!-- 数式表示バッジ -->
+        <div class="hidden md:flex items-center bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-sm font-mono text-sky-300">
+            \( y = \sum_{k=1}^{4} \sin(k x) \)
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 p-3 overflow-hidden min-h-0">
+        
+        <!-- 左側・中央: 描画キャンバス (単位円 + グラフ) -->
+        <div class="lg:col-span-8 bg-slate-950 border border-slate-800 rounded-2xl relative flex flex-col overflow-hidden shadow-inner">
+            
+            <!-- キャンバス情報オーバーレイ -->
+            <div class="absolute top-3 left-3 z-10 flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
+                <span class="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse"></span>
+                <span class="text-slate-300 font-medium">リアルタイム連動ビュー</span>
+            </div>
+
+            <!-- 3D/2D 描画キャンバス -->
+            <div class="flex-1 w-full h-full relative" id="canvas-container">
+                <canvas id="simCanvas" class="absolute inset-0 w-full h-full block"></canvas>
+            </div>
+
+            <!-- キャンバス下部ガイド -->
+            <div class="bg-slate-900/90 border-t border-slate-800/80 px-4 py-2 flex items-center justify-between text-xs text-slate-400 shrink-0">
+                <div class="flex items-center gap-4">
+                    <span class="flex items-center gap-1.5">
+                        <span class="w-3 h-0.5 bg-sky-400 inline-block"></span> 合成波 \( y \)
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <span class="w-3 h-0.5 bg-amber-400 border border-dashed inline-block"></span> 補助線（高さ伝達）
+                    </span>
+                </div>
+                <div>
+                    マウスドラッグ / タッチでグラフ位置の観察が可能
+                </div>
+            </div>
+        </div>
+
+        <!-- 右側: コントロールパネル & 数値モニタ -->
+        <div class="lg:col-span-4 flex flex-col gap-3 overflow-y-auto pr-1">
+            
+            <!-- 1. x の操作コントロール -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 shadow-lg">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i data-lucide="sliders" class="w-4 h-4 text-sky-400"></i>
+                        変数 \( x \) の操作
+                    </h2>
+                    <span id="x-rad-display" class="font-mono text-sm font-bold text-sky-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                        x = 0.00 rad
+                    </span>
+                </div>
+
+                <!-- アニメーション再生・停止・リセット -->
+                <div class="flex items-center gap-2">
+                    <button id="btn-play" class="flex-1 py-2 bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-md shadow-sky-600/20">
+                        <i data-lucide="play" id="icon-play" class="w-4 h-4"></i>
+                        <span id="text-play">再生</span>
+                    </button>
+                    <button id="btn-reset" class="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs flex items-center justify-center transition border border-slate-700" title="x = 0 にリセット">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    </button>
+                    <!-- スピード選択 -->
+                    <select id="speed-select" class="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-xl px-2.5 py-2 focus:outline-none focus:border-sky-500">
+                        <option value="0.5">0.5x</option>
+                        <option value="1.0" selected>1.0x</option>
+                        <option value="2.0">2.0x</option>
+                    </select>
+                </div>
+
+                <!-- スライダー & π/2 目盛りマーク -->
+                <div class="space-y-2 pt-1">
+                    <div class="flex justify-between text-[11px] font-mono text-slate-400 px-0.5">
+                        <span>0</span>
+                        <span class="text-sky-400 font-bold">π/2</span>
+                        <span>π</span>
+                        <span class="text-sky-400 font-bold">3π/2</span>
+                        <span>2π</span>
+                    </div>
+                    <input type="range" id="x-slider" min="0" max="6.283185307179586" step="0.005" value="0" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                    
+                    <!-- π/2 区切りのスナップ目盛り表示線 -->
+                    <div class="relative w-full h-1">
+                        <div class="absolute left-[0%] w-0.5 h-1.5 bg-slate-600 -translate-x-1/2"></div>
+                        <div class="absolute left-[25%] w-0.5 h-2 bg-sky-500 -translate-x-1/2"></div>
+                        <div class="absolute left-[50%] w-0.5 h-1.5 bg-slate-600 -translate-x-1/2"></div>
+                        <div class="absolute left-[75%] w-0.5 h-2 bg-sky-500 -translate-x-1/2"></div>
+                        <div class="absolute left-[100%] w-0.5 h-1.5 bg-slate-600 -translate-x-1/2"></div>
+                    </div>
+                </div>
+
+                <!-- 主要な角度へのワンタップボタン -->
+                <div class="space-y-1.5 pt-1">
+                    <span class="text-[11px] font-semibold text-slate-400">主要な角へジャンプ:</span>
+                    <div class="grid grid-cols-5 gap-1 text-[11px] font-mono">
+                        <button data-angle="0" class="angle-btn py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300 transition">0</button>
+                        <button data-angle="0.785398" class="angle-btn py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300 transition">π/4</button>
+                        <button data-angle="1.570796" class="angle-btn py-1 bg-sky-900/40 hover:bg-sky-800/60 border border-sky-700 text-sky-300 rounded transition font-bold">π/2</button>
+                        <button data-angle="2.356194" class="angle-btn py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300 transition">3π/4</button>
+                        <button data-angle="3.141593" class="angle-btn py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300 transition">π</button>
+                        <button data-angle="3.926991" class="angle-btn py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300 transition">5π/4</button>
+                        <button data-angle="4.712389" class="angle-btn py-1 bg-sky-900/40 hover:bg-sky-800/60 border border-sky-700 text-sky-300 rounded transition font-bold">3π/2</button>
+                        <button data-angle="5.497787" class="angle-btn py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300 transition">7π/4</button>
+                        <button data-angle="6.283185" class="angle-btn py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-300 transition">2π</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 表示トグルオプション -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
+                <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider">表示設定</h2>
+                
+                <div class="space-y-2 text-xs">
+                    <label class="flex items-center justify-between p-2 bg-slate-950 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700 transition">
+                        <span class="text-slate-300 flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                            各項のベクトル合成 (足し算)
+                        </span>
+                        <input type="checkbox" id="chk-show-phasors" checked class="rounded accent-sky-500 w-4 h-4">
+                    </label>
+
+                    <label class="flex items-center justify-between p-2 bg-slate-950 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700 transition">
+                        <span class="text-slate-300 flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
+                            個別の波 (\(\sin kx\)) も表示
+                        </span>
+                        <input type="checkbox" id="chk-show-components" class="rounded accent-sky-500 w-4 h-4">
+                    </label>
+
+                    <label class="flex items-center justify-between p-2 bg-slate-950 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700 transition">
+                        <span class="text-slate-300 flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                            高さの補助線 (円 \(\rightarrow\) グラフ)
+                        </span>
+                        <input type="checkbox" id="chk-show-guidelines" checked class="rounded accent-sky-500 w-4 h-4">
+                    </label>
+                </div>
+            </div>
+
+            <!-- 3. リアルタイム計算値表示 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg flex-1">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider">各項の計算結果</h2>
+                    <span id="y-total-display" class="font-mono text-sm font-bold text-emerald-400">
+                        y = 0.00
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                    <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
+                        <div class="text-[10px] text-slate-400 flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-blue-400"></span> sin(x)
+                        </div>
+                        <div id="val-sin1" class="text-slate-200 font-bold mt-1">0.000</div>
+                    </div>
+                    <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
+                        <div class="text-[10px] text-slate-400 flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400"></span> sin(2x)
+                        </div>
+                        <div id="val-sin2" class="text-slate-200 font-bold mt-1">0.000</div>
+                    </div>
+                    <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
+                        <div class="text-[10px] text-slate-400 flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-amber-400"></span> sin(3x)
+                        </div>
+                        <div id="val-sin3" class="text-slate-200 font-bold mt-1">0.000</div>
+                    </div>
+                    <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
+                        <div class="text-[10px] text-slate-400 flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-purple-400"></span> sin(4x)
+                        </div>
+                        <div id="val-sin4" class="text-slate-200 font-bold mt-1">0.000</div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+                    <span class="text-sky-400 font-semibold">ヒント:</span> 単位円側では、長さ1の4つのベクトルが順々に足し合わされ、最終的な先端の高さがグラフの \(y\) の値を作っていることが分かります。
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // Lucide アイコン初期化
+        lucide.createIcons();
+
+        // -----------------------------------------------------------------
+        // 1. アプリケーション状態変数
+        // -----------------------------------------------------------------
+        let currentX = 0; // 0 to 2*PI
+        let isPlaying = false;
+        let playSpeed = 1.0;
+        let animationFrameId = null;
+
+        // トグル設定
+        let showPhasors = true;
+        let showComponents = false;
+        let showGuidelines = true;
+
+        // DOM要素の参照
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+
+        const xSlider = document.getElementById('x-slider');
+        const xRadDisplay = document.getElementById('x-rad-display');
+        const yTotalDisplay = document.getElementById('y-total-display');
+
+        const btnPlay = document.getElementById('btn-play');
+        const iconPlay = document.getElementById('icon-play');
+        const textPlay = document.getElementById('text-play');
+        const btnReset = document.getElementById('btn-reset');
+        const speedSelect = document.getElementById('speed-select');
+
+        // 各項の数値表示エレメント
+        const valSin1 = document.getElementById('val-sin1');
+        const valSin2 = document.getElementById('val-sin2');
+        const valSin3 = document.getElementById('val-sin3');
+        const valSin4 = document.getElementById('val-sin4');
+
+        // -----------------------------------------------------------------
+        // 2. 数学計算ヘルパー関数
+        // -----------------------------------------------------------------
+        function calculateY(x) {
+            const s1 = Math.sin(x);
+            const s2 = Math.sin(2 * x);
+            const s3 = Math.sin(3 * x);
+            const s4 = Math.sin(4 * x);
+            return {
+                s1, s2, s3, s4,
+                total: s1 + s2 + s3 + s4
+            };
+        }
+
+        function formatRad(x) {
+            const deg = Math.round((x * 180) / Math.PI);
+            return `x = ${x.toFixed(2)} rad (${deg}°)`;
+        }
+
+        // -----------------------------------------------------------------
+        // 3. Canvas 2D 描画コアエンジン
+        // -----------------------------------------------------------------
+        function resizeCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = container.clientWidth * dpr;
+            canvas.height = container.clientHeight * dpr;
+            ctx.scale(dpr, dpr);
+            render();
+        }
+
+        function render() {
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // レイアウト計算（左側：単位円＋ベクトル合成、右側：y-xグラフ）
+            const isMobile = w < 640;
+            const circleWidth = isMobile ? w : Math.min(w * 0.35, 280);
+            const graphLeft = circleWidth;
+            const graphWidth = w - graphLeft - 20;
+
+            const centerY = h / 2;
+            const circleCenterX = circleWidth / 2;
+
+            // 拡大縮小スケール設定
+            // y の最大絶対値は約 3.8
+            const scaleY = (h * 0.38) / 4.0; 
+            const unitR = scaleY; // 単位円の半径 (sin x = 1 に対応するピクセル長)
+
+            // --- A. 単位円 & ベクトル合成エリアの描画 ---
+            
+            // 背景の円ガイド（半径1）
+            ctx.beginPath();
+            ctx.arc(circleCenterX, centerY, unitR, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#334155'; // Slate 700
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 単位円の座標軸
+            ctx.beginPath();
+            ctx.moveTo(circleCenterX - unitR - 15, centerY);
+            ctx.lineTo(circleCenterX + unitR + 15, centerY);
+            ctx.moveTo(circleCenterX, centerY - unitR - 15);
+            ctx.lineTo(circleCenterX, centerY + unitR + 15);
+            ctx.strokeStyle = '#1e293b'; // Slate 800
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // 単位円ラベル
+            ctx.fillStyle = '#64748b';
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('単位円 (r=1)', circleCenterX, centerY + unitR + 25);
+
+            // 角度 x の扇形（アーク）描画
+            ctx.beginPath();
+            ctx.moveTo(circleCenterX, centerY);
+            ctx.arc(circleCenterX, centerY, unitR * 0.3, 0, -currentX, true);
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+            ctx.fill();
+
+            // ベクトル先端の計算 (Tip-to-Tail)
+            let currX = circleCenterX;
+            let currY = centerY;
+
+            const angles = [currentX, 2 * currentX, 3 * currentX, 4 * currentX];
+            const colors = ['#60a5fa', '#34d399', '#fbbf24', '#c084fc']; // Blue, Green, Amber, Purple
+
+            if (showPhasors) {
+                // 各項のベクトルを繋ぎ合わせて描画
+                for (let i = 0; i < 4; i++) {
+                    const ang = angles[i];
+                    const nextX = currX + unitR * Math.cos(ang);
+                    const nextY = currY - unitR * Math.sin(ang); // CanvasのYは下向きが正
+
+                    // ベクトル矢印
+                    ctx.beginPath();
+                    ctx.moveTo(currX, currY);
+                    ctx.lineTo(nextX, nextY);
+                    ctx.strokeStyle = colors[i];
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // 先端の小さな丸
+                    ctx.beginPath();
+                    ctx.arc(nextX, nextY, 3, 0, 2 * Math.PI);
+                    ctx.fillStyle = colors[i];
+                    ctx.fill();
+
+                    currX = nextX;
+                    currY = nextY;
+                }
+            } else {
+                // 単純な角 x の単位円上の点
+                const mainX = circleCenterX + unitR * Math.cos(currentX);
+                const mainY = centerY - unitR * Math.sin(currentX);
+                
+                ctx.beginPath();
+                ctx.moveTo(circleCenterX, centerY);
+                ctx.lineTo(mainX, mainY);
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(mainX, mainY, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = '#38bdf8';
+                ctx.fill();
+
+                currY = centerY - unitR * calculateY(currentX).total;
+            }
+
+            // 合成ベクトルの最終先端の強調表示
+            ctx.beginPath();
+            ctx.arc(currX, currY, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = '#38bdf8';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // --- B. 右側 グラフエリアの描画 ---
+
+            // X軸目盛りの位置定義 (0, π/2, π, 3π/2, 2π)
+            const xTicks = [
+                { val: 0, label: '0' },
+                { val: Math.PI / 2, label: 'π/2' },
+                { val: Math.PI, label: 'π' },
+                { val: (3 * Math.PI) / 2, label: '3π/2' },
+                { val: 2 * Math.PI, label: '2π' }
+            ];
+
+            function mapXToCanvas(xVal) {
+                return graphLeft + (xVal / (2 * Math.PI)) * graphWidth;
+            }
+
+            // グラフグリッド & 軸
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+
+            // Y軸グリッド（y = -2, -1, 0, 1, 2...）
+            for (let yVal = -4; yVal <= 4; yVal += 1) {
+                const py = centerY - yVal * scaleY;
+                ctx.beginPath();
+                ctx.moveTo(graphLeft, py);
+                ctx.lineTo(graphLeft + graphWidth, py);
+                ctx.stroke();
+            }
+
+            // X軸（y = 0 の中央線）
+            ctx.beginPath();
+            ctx.moveTo(graphLeft, centerY);
+            ctx.lineTo(graphLeft + graphWidth, centerY);
+            ctx.strokeStyle = '#475569'; // Slate 600
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // X軸目盛り線 & テキスト (π/2 区切り強調)
+            xTicks.forEach(tick => {
+                const px = mapXToCanvas(tick.val);
+                
+                // 垂直グリッド線
+                ctx.beginPath();
+                ctx.moveTo(px, 20);
+                ctx.lineTo(px, h - 25);
+                ctx.strokeStyle = (tick.val % Math.PI === 0) ? '#334155' : '#1e293b';
+                ctx.lineWidth = (tick.val % (Math.PI / 2) === 0) ? 1.5 : 1;
+                ctx.setLineDash([2, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // テキストラベル
+                ctx.fillStyle = (tick.val === Math.PI / 2 || tick.val === 3 * Math.PI / 2) ? '#38bdf8' : '#94a3b8';
+                ctx.font = '11px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(tick.label, px, h - 8);
+            });
+
+            // --- C. 波のグラフ曲線プロット ---
+
+            // 1. 個別の成分波（オプション表示）
+            if (showComponents) {
+                for (let k = 1; k <= 4; k++) {
+                    ctx.beginPath();
+                    for (let px = 0; px <= graphWidth; px += 2) {
+                        const xVal = (px / graphWidth) * (2 * Math.PI);
+                        const yVal = Math.sin(k * xVal);
+                        const py = centerY - yVal * scaleY;
+
+                        if (px === 0) ctx.moveTo(graphLeft + px, py);
+                        else ctx.lineTo(graphLeft + px, py);
+                    }
+                    ctx.strokeStyle = colors[k - 1];
+                    ctx.lineWidth = 1.2;
+                    ctx.globalAlpha = 0.5;
+                    ctx.stroke();
+                    ctx.globalAlpha = 1.0;
+                }
+            }
+
+            // 2. メインの合成波 y = sin x + sin 2x + sin 3x + sin 4x
+            ctx.beginPath();
+            for (let px = 0; px <= graphWidth; px += 2) {
+                const xVal = (px / graphWidth) * (2 * Math.PI);
+                const vals = calculateY(xVal);
+                const py = centerY - vals.total * scaleY;
+
+                if (px === 0) ctx.moveTo(graphLeft + px, py);
+                else ctx.lineTo(graphLeft + px, py);
+            }
+            ctx.strokeStyle = '#38bdf8'; // Sky Blue
+            ctx.lineWidth = 3;
+            ctx.shadowColor = 'rgba(56, 189, 248, 0.4)';
+            ctx.shadowBlur = 8;
+            ctx.stroke();
+            ctx.shadowBlur = 0; // リセット
+
+            // --- D. 現在位置のマーカー & 補助線連動 ---
+
+            const currentCanvasX = mapXToCanvas(currentX);
+            const currentYVal = calculateY(currentX).total;
+            const currentCanvasY = centerY - currentYVal * scaleY;
+
+            // 高さを横方向に繋ぐガイド破線 (単位円/ベクトル先端 -> グラフ上の点)
+            if (showGuidelines) {
+                ctx.beginPath();
+                ctx.moveTo(currX, currY);
+                ctx.lineTo(currentCanvasX, currentCanvasY);
+                ctx.strokeStyle = '#f59e0b'; // Amber
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // グラフ上の現在点の垂直インジケーター線
+            ctx.beginPath();
+            ctx.moveTo(currentCanvasX, 10);
+            ctx.lineTo(currentCanvasX, h - 25);
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // グラフ上の現在点（発光ドット）
+            ctx.beginPath();
+            ctx.arc(currentCanvasX, currentCanvasY, 7, 0, 2 * Math.PI);
+            ctx.fillStyle = '#38bdf8';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+        }
+
+        // -----------------------------------------------------------------
+        // 4. UI 状態更新 & イベント制御
+        // -----------------------------------------------------------------
+        function updateUI() {
+            // スライダーとテキスト更新
+            xSlider.value = currentX;
+            xRadDisplay.textContent = formatRad(currentX);
+
+            // 各項の計算結果更新
+            const vals = calculateY(currentX);
+            valSin1.textContent = vals.s1.toFixed(3);
+            valSin2.textContent = vals.s2.toFixed(3);
+            valSin3.textContent = vals.s3.toFixed(3);
+            valSin4.textContent = vals.s4.toFixed(3);
+            
+            yTotalDisplay.textContent = `y = ${vals.total >= 0 ? '+' : ''}${vals.total.toFixed(3)}`;
+
+            render();
+        }
+
+        // アニメーションループ
+        let lastTime = null;
+        function animateLoop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            if (isPlaying) {
+                currentX += dt * 0.8 * playSpeed; // 基本速度
+                if (currentX > 2 * Math.PI) {
+                    currentX %= (2 * Math.PI);
+                }
+                updateUI();
+            }
+
+            animationFrameId = requestAnimationFrame(animateLoop);
+        }
+
+        // 再生 / 一時停止 トグル
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            if (isPlaying) {
+                iconPlay.setAttribute('data-lucide', 'pause');
+                textPlay.textContent = '一時停止';
+                btnPlay.classList.replace('bg-sky-600', 'bg-amber-600');
+                btnPlay.classList.replace('hover:bg-sky-500', 'hover:bg-amber-500');
+            } else {
+                iconPlay.setAttribute('data-lucide', 'play');
+                textPlay.textContent = '再生';
+                btnPlay.classList.replace('bg-amber-600', 'bg-sky-600');
+                btnPlay.classList.replace('hover:bg-amber-500', 'hover:bg-sky-500');
+            }
+            lucide.createIcons();
+        }
+
+        // イベントリスナー登録
+        xSlider.addEventListener('input', (e) => {
+            currentX = parseFloat(e.target.value);
+            updateUI();
+        });
+
+        btnPlay.addEventListener('click', togglePlay);
+
+        btnReset.addEventListener('click', () => {
+            currentX = 0;
+            if (isPlaying) togglePlay();
+            updateUI();
+        });
+
+        speedSelect.addEventListener('change', (e) => {
+            playSpeed = parseFloat(e.target.value);
+        });
+
+        // 角度クイックボタン
+        document.querySelectorAll('.angle-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentX = parseFloat(btn.getAttribute('data-angle'));
+                if (isPlaying) togglePlay();
+                updateUI();
+            });
+        });
+
+        // 表示設定トグル
+        document.getElementById('chk-show-phasors').addEventListener('change', (e) => {
+            showPhasors = e.target.checked;
+            render();
+        });
+
+        document.getElementById('chk-show-components').addEventListener('change', (e) => {
+            showComponents = e.target.checked;
+            render();
+        });
+
+        document.getElementById('chk-show-guidelines').addEventListener('change', (e) => {
+            showGuidelines = e.target.checked;
+            render();
+        });
+
+        // ウィンドウリサイズ対応
+        window.addEventListener('resize', resizeCanvas);
+
+        // 初回起動処理
+        window.onload = function() {
+            resizeCanvas();
+            updateUI();
+            requestAnimationFrame(animateLoop);
+        };
+    </script>
+</body>
+</html>
