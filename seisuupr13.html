@@ -35,13 +35,6 @@
         input[type=range] {
             accent-color: #3b82f6;
         }
-        @keyframes pulse-glow {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
-            50% { box-shadow: 0 0 12px 4px rgba(59, 130, 246, 0.8); }
-        }
-        .pulse-near {
-            animation: pulse-glow 1.2s infinite;
-        }
     </style>
 </head>
 <body class="text-slate-800 p-2 sm:p-4 md:p-6 flex flex-col justify-between">
@@ -165,11 +158,6 @@
                         <span class="text-[11px] text-slate-400 font-normal">
                             (≈ <span id="sum-decimal-display">3.0000</span>)
                         </span>
-                    </div>
-
-                    <!-- Near Target Indicator -->
-                    <div id="near-indicator" class="hidden text-center py-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold rounded-md animate-bounce">
-                        <i class="fa-solid fa-bullseye text-blue-500"></i> 惜しい！目標値「2.0」に非常に接近中！
                     </div>
 
                     <!-- Stacked Bar Gauge vs Target 2 -->
@@ -322,11 +310,9 @@
 
         const seesawBeam = document.getElementById('seesaw-beam');
         const seesawLeftVal = document.getElementById('seesaw-left-val');
-        const leftWeightBox = document.getElementById('left-weight-box');
 
         const inequalityWarning = document.getElementById('inequality-warning');
         const statusBadge = document.getElementById('status-badge');
-        const nearIndicator = document.getElementById('near-indicator');
         const equationCard = document.getElementById('equation-card');
         const solutionsList = document.getElementById('solutions-list');
         const completionCounter = document.getElementById('completion-counter');
@@ -403,17 +389,8 @@
             const angle = Math.max(-15, Math.min(15, diff * 12));
             seesawBeam.style.transform = `rotate(${-angle}deg)`;
 
-            // Near target visual effect (Close to 2.0 within 0.1 margin)
-            const absDiff = Math.abs(diff);
-            if (isValidOrder && absDiff > 0 && absDiff <= 0.1) {
-                nearIndicator.classList.remove('hidden');
-                leftWeightBox.classList.add('pulse-near');
-            } else {
-                nearIndicator.classList.add('hidden');
-                leftWeightBox.classList.remove('pulse-near');
-            }
-
             // Check Exact Match
+            const absDiff = Math.abs(diff);
             const isSuccess = isValidOrder && absDiff < 1e-9;
 
             if (isSuccess) {
@@ -452,7 +429,7 @@
             updateState();
         }
 
-        // Confetti Fireworks (Visual Celebration only, no sound)
+        // Confetti Fireworks (Visual Celebration only)
         function triggerConfetti() {
             if (window.confetti) {
                 confetti({
