@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#163b60">
+  <meta name="description" content="高校数学のシミュレーションを分野別に集めた、動かして試せる場所。">
+  <title>シミュレーション置場</title>
+  <style>
+    :root {
+      --navy: #163b60;
+      --blue: #277ca0;
+      --teal: #69b7b3;
+      --ink: #24384d;
+      --muted: #65778a;
+      --line: #dce5ec;
+      --paper: #f5f7fa;
+      --white: #ffffff;
+      --shadow: 0 8px 28px rgba(22, 59, 96, .07);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN",
+        "Yu Gothic", "Noto Sans JP", Meiryo, sans-serif;
+      line-height: 1.75;
+      letter-spacing: .025em;
+    }
+    a { color: inherit; text-decoration: none; }
+    .wrap { width: min(1080px, calc(100% - 36px)); margin: 0 auto; }
+    header {
+      background: rgba(255,255,255,.94);
+      border-bottom: 1px solid var(--line);
+      position: sticky; top: 0; z-index: 10;
+      backdrop-filter: blur(12px);
+    }
+    .nav {
+      min-height: 72px; display: flex; align-items: center;
+      justify-content: space-between; gap: 18px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .mark {
+      width: 42px; height: 42px; flex: 0 0 42px;
+      display: grid; place-items: center; border-radius: 12px;
+      background: var(--navy); color: white;
+    }
+    .brand-name { font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; font-size: 1.35rem; font-weight: 600; letter-spacing: .12em; line-height: 1.2; }
+    .brand-en { font-size: .62rem; color: var(--muted); letter-spacing: .24em; margin-top: 4px; }
+    .nav-link { color: var(--navy); font-size: .9rem; font-weight: 600; }
+    .hero {
+      color: white; overflow: hidden; position: relative;
+      background: radial-gradient(circle at 78% 25%, rgba(105,183,179,.4), transparent 22%),
+        radial-gradient(circle at 88% 90%, rgba(39,124,160,.45), transparent 34%),
+        linear-gradient(125deg, #102e4d, #163b60 58%, #245d7c);
+    }
+    .hero::after {
+      content: ""; position: absolute; width: 330px; height: 330px;
+      right: -80px; top: -105px; border: 1px solid rgba(255,255,255,.18);
+      border-radius: 50%; box-shadow: 0 0 0 35px rgba(255,255,255,.035), 0 0 0 75px rgba(255,255,255,.025);
+      pointer-events: none;
+    }
+    .hero-inner { padding: 66px 0 62px; position: relative; z-index: 1; }
+    .eyebrow { text-transform: uppercase; letter-spacing: .2em; font-size: .72rem; color: #a9d9dc; font-weight: 700; }
+    h1 {
+      margin: 14px 0 14px; font-size: clamp(2.25rem, 6vw, 4.2rem);
+      line-height: 1.2; font-weight: 600; letter-spacing: .09em;
+      font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+    }
+    h1 span { color: #8bd1d0; }
+    .hero-copy { max-width: 610px; color: #e1eaf1; font-size: clamp(.95rem, 2.2vw, 1.08rem); }
+    .hero-note { margin-top: 24px; display: inline-flex; gap: 10px; align-items: center; color: #d7e7ee; font-size: .88rem; }
+    .hero-note::before { content: ""; width: 28px; height: 1px; background: var(--teal); }
+    main { padding: 28px 0 60px; }
+    .section-head { display: flex; justify-content: space-between; align-items: end; gap: 20px; margin-bottom: 22px; }
+    .section-kicker { color: var(--blue); text-transform: uppercase; letter-spacing: .17em; font-size: .7rem; font-weight: 800; }
+    h2 { color: var(--navy); margin: 3px 0 0; font-size: clamp(1.45rem, 3vw, 1.9rem); font-weight: 650; letter-spacing: .04em; }
+    .section-desc { color: var(--muted); font-size: .88rem; max-width: 400px; margin: 0; }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 22px; }
+    .filter {
+      appearance: none; border: 1px solid #d4e0e9; background: white; color: var(--navy);
+      border-radius: 999px; padding: 8px 14px; font: inherit; font-size: .82rem;
+      cursor: pointer; transition: .18s ease;
+    }
+    .filter:hover, .filter.active { background: var(--navy); color: white; border-color: var(--navy); }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; }
+    .card {
+      background: white; border: 1px solid var(--line); border-radius: 16px;
+      padding: 21px 20px 18px; min-height: 196px; display: flex; flex-direction: column;
+      box-shadow: 0 2px 8px rgba(22,59,96,.025); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+    .card:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: #b9d2df; }
+    .card-top { display: flex; justify-content: space-between; align-items: start; gap: 10px; }
+    .icon {
+      width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px;
+      background: #edf5f8; color: var(--blue); flex: 0 0 44px;
+    }
+    .icon svg { width: 25px; height: 25px; }
+    .num { font-size: .68rem; letter-spacing: .13em; color: #8a9aaa; font-weight: 700; }
+    .card h3 { color: var(--navy); font-size: 1.12rem; margin: 13px 0 5px; letter-spacing: .025em; }
+    .card p { margin: 0; color: var(--muted); font-size: .84rem; line-height: 1.7; }
+    .card-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 17px; }
+    .tag { color: #3f7c86; background: #edf7f5; padding: 3px 9px; border-radius: 999px; font-size: .68rem; }
+    .arrow { color: var(--blue); font-size: 1.15rem; }
+
+    .field-card { min-height: 0; }
+    .field-desc { min-height: 3.2em; }
+    .app-list { display: grid; gap: 0; margin-top: 13px; border-top: 1px solid #edf1f4; }
+    .app-link { display: block; padding: 11px 0; border-bottom: 1px solid #edf1f4; border-radius: 2px; }
+    .app-link:last-child { border-bottom: 0; }
+    .app-link:hover .app-title { color: var(--blue); }
+    .app-link:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+    .app-title { display: block; color: var(--navy); font-size: .86rem; font-weight: 700; line-height: 1.5; }
+    .link-arrow { color: var(--blue); white-space: nowrap; }
+    .app-desc { display: block; margin-top: 3px; color: var(--muted); font-size: .76rem; line-height: 1.55; }
+    .app-count { color: #8493a1; font-size: .7rem; white-space: nowrap; }
+    .field-card .card-bottom { padding-top: 12px; }
+
+    .empty { display: none; padding: 30px; text-align: center; color: var(--muted); background: white; border-radius: 14px; }
+    .method {
+      margin-top: 46px; background: #eaf1f5; border: 1px solid #dce7ed;
+      border-radius: 18px; padding: 24px 26px; display: grid;
+      grid-template-columns: auto 1fr; gap: 18px; align-items: start;
+    }
+    .method-symbol { color: var(--blue); padding-top: 3px; }
+    .method h2 { font-size: 1.15rem; margin: 0 0 5px; }
+    .method p { color: #566b7e; font-size: .88rem; margin: 0; }
+    .intro { margin: 0 0 34px; background: #ffffff; border-color: #e0e7ed; }
+    .intro .method-symbol { color: #277ca0; }
+    .intro h2 { font-size: 1.2rem; }
+    footer { border-top: 1px solid var(--line); background: white; }
+    .footer-inner { padding: 22px 0 28px; display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .footer-brand { color: var(--navy); font-family: "Yu Mincho", "Hiragino Mincho ProN", serif; letter-spacing: .1em; }
+    .copyright { color: #8493a1; font-size: .73rem; }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hero-inner { padding: 52px 0 48px; }
+      .section-head { display: block; }
+      .section-desc { margin-top: 8px; }
+    }
+    @media (max-width: 520px) {
+      .wrap { width: min(100% - 26px, 1080px); }
+      .nav { min-height: 64px; }
+      .brand-name { font-size: 1.18rem; }
+      .nav-link { font-size: .78rem; }
+      .hero-inner { padding: 43px 0 42px; }
+      .grid { grid-template-columns: 1fr; gap: 11px; }
+      .card { min-height: 0; padding: 17px; }
+      .card h3 { margin-top: 10px; }
+      .card-bottom { padding-top: 12px; }
+      .method { padding: 19px; grid-template-columns: 1fr; gap: 7px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <a class="brand" href="#" aria-label="シミュレーション置場 トップ">
+        <span class="mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40" width="34" height="34" fill="none">
+            <circle cx="20" cy="20" r="11.5" stroke="white" stroke-width="1.15"/>
+            <ellipse cx="20" cy="20" rx="6.5" ry="15.5" stroke="#8bd1d0" stroke-width="1.25" transform="rotate(38 20 20)"/>
+            <ellipse cx="20" cy="20" rx="6.5" ry="15.5" stroke="white" stroke-width="1.1" transform="rotate(-38 20 20)"/>
+            <circle cx="20" cy="20" r="2" fill="#8bd1d0"/>
+          </svg>
+        </span>
+        <span><span class="brand-name">シミュレーション置場</span><span class="brand-en" style="display:block">SIMULATION OKIBA</span></span>
+      </a>
+      <a class="nav-link" href="#fields">分野から探す　↓</a>
+    </div>
+  </header>
+
+  <main id="fields">
+    <div class="wrap">
+      
+      <section class="method intro">
+        <div class="method-symbol" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M5 22c2-5 5-7 8-7s6 2 8 7M3 24h26"/>
+            <circle cx="10" cy="10" r="3"/>
+            <circle cx="22" cy="9" r="2"/>
+          </svg>
+        </div>
+        <div>
+          <h2>数学で、自由に遊んでみよう。</h2>
+          <p>ここは、公園の砂場のような場所です。<br>
+          数学のシミュレーションを実際に動かしたり、条件を変えて試したりしながら、自分なりの発見を楽しんでください。</p>
+        </div>
+      </section>
+
+      <div class="section-head">
+        <div>
+          <div class="section-kicker">Explore by field</div>
+          <h2>数学の入口を選ぶ</h2>
+        </div>
+        <p class="section-desc">教科書の順番ではなく、数学の考え方や現象に沿って分類しています。</p>
+      </div>
+
+      <div class="filters" aria-label="分野を絞り込む">
+        <button class="filter active" type="button" data-filter="all">すべて</button>
+        <button class="filter" type="button" data-filter="geometry">図形・空間</button>
+        <button class="filter" type="button" data-filter="function">関数・変化</button>
+        <button class="filter" type="button" data-filter="probability">確率・統計</button>
+        <button class="filter" type="button" data-filter="sequence">数列・規則性</button>
+        <button class="filter" type="button" data-filter="algebra">数と式・代数</button>
+        <button class="filter" type="button" data-filter="vector">ベクトル・座標</button>
+        <button class="filter" type="button" data-filter="logic">論理・集合</button>
+        <button class="filter" type="button" data-filter="inquiry">横断・探究</button>
+      </div>
+
+      <div class="grid" id="field-grid">
+        <!--
+          URLの追加・編集方法：
+          各分野の <div class="app-list"> 内にある
+          <a class="app-link" href="ここにURL" target="_blank" rel="noopener noreferrer">
+            <span class="app-title">シミュレーション名</span>
+            <span class="app-desc">説明</span>
+          </a>
+          を複製し、タイトル・説明・URLを変更してください。
+          まだURLがない項目は href="#" のままで構いません。
+        -->
+        <section class="card field-card" data-category="geometry">
+          <div class="card-top"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 18 12 4l8 14Z"/><path d="M4 18h16M12 4v14"/></svg></span><span class="num">01 / GEO</span></div>
+          <h3>図形・空間</h3><p class="field-desc">図形を動かし、切り、重ねる。形の中に隠れた関係を探る。</p>
+          <div class="app-list">
+            <a class="app-link" href="#" target="_blank" rel="noopener noreferrer">
+              <span class="app-title">正多面体の切断シミュレーター <span class="link-arrow">↗</span></span>
+              <span class="app-desc">正多面体を切断し、できる立体の形を観察する。</span>
+            </a>
+            <a class="app-link" href="#" target="_blank" rel="noopener noreferrer">
+              <span class="app-title">球面上の図形 <span class="link-arrow">↗</span></span>
+              <span class="app-desc">球面や測地線を動かし、平面との違いを探る。</span>
+            </a>
+          </div>
+          <div class="card-bottom"><span class="tag">図形・立体・計量</span><span class="app-count">2 アプリ</span></div>
+        </section>
+
+        <section class="card field-card" data-category="function">
+          <div class="card-top"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 20h18M4 21V3"/><path d="M5 17c3-1 4-11 8-10s3 8 7 2"/></svg></span><span class="num">02 / FUN</span></div>
+          <h3>関数・変化</h3><p class="field-desc">パラメータを変え、グラフの動きから変化の仕組みを読む。</p>
+          <div class="app-list">
+            <a class="app-link" href="#" target="_blank" rel="noopener noreferrer">
+              <span class="app-title">関数グラフ・パラメータ実験 <span class="link-arrow">↗</span></span>
+              <span class="app-desc">係数を変化させ、グラフの移動や形の変化を調べる。</span>
+            </a>
+          </div>
+          <div class="card-bottom"><span class="tag">関数・微積分</span><span class="app-count">1 アプリ</span></div>
+        </section>
+
+        <section class="card field-card" data-category="probability">
+          <div class="card-top"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="16" cy="16" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg></span><span class="num">03 / PRO</span></div>
+          <h3>確率・統計</h3><p class="field-desc">試行を繰り返し、偶然のゆらぎとデータに潜む傾向を観察する。</p>
+          <div class="app-list">
+            <a class="app-link" href="#" target="_blank" rel="noopener noreferrer">
+              <span class="app-title">確率の反復実験 <span class="link-arrow">↗</span></span>
+              <span class="app-desc">試行回数を増やし、理論値と実験結果を比べる。</span>
+            </a>
+            <a class="app-link" href="#" target="_blank" rel="noopener noreferrer">
+              <span class="app-title">仮説検定のシミュレーション <span class="link-arrow">↗</span></span>
+              <span class="app-desc">偶然に起こる結果のばらつきを視覚的に確かめる。</span>
+            </a>
+          </div>
+          <div class="card-bottom"><span class="tag">確率・データ分析</span><span class="app-count">2 アプリ</span></div>
+        </section>
+
+        <section class="card field-card" data-category="sequence">
+          <div class="card-top"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 19h18"/><rect x="4" y="13" width="3" height="6" rx="1"/><rect x="10.5" y="9" width="3" height="10" rx="1"/><rect x="17" y="4" width="3" height="15" rx="1"/></svg></span><span class="num">04 / SEQ</span></div>
+          <h3>数列・規則性</h3><p class="field-desc">繰り返しや再帰から、次の一手や全体を支配する法則を見つける。</p>
+          <div class="app-list">
+            <a class="app-link" href="#" target="_blank" rel="noopener noreferrer">
+              <span class="app-title">数列の項とグラフ <span class="link-arrow">↗</span></span>
+              <span class="app-desc">項番号と値の対応を可視化し、増え方を観察する。</span>
+            </a>
+          </div>
+          <div class="card-bottom"><span class="tag">数列・漸化式</span><span class="app-count">1 アプリ</span></div>
+        </section>
+
+        <section class="card field-card" data-category="algebra">
+          <div class="card-top"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 7h14M5 17h14M8 4 5 7l3 3M16 14l3 3-3 3"/><path d="M12 7v10"/></svg></span><span class="num">05 / ALG</span></div>
+          <h3>数と式・代数</h3><p class="field-desc">式の形を変え、数の性質や計算の背後にある構造を見つける。</p>
+          <div class="app-list">
+            <a class="app-link" href="#" target="_blank" rel="noopener noreferrer">
+              <span class="app-title">式の変形ビジュアライザー <span class="link-arrow">↗</span></span>
+              <span class="app-desc">式の同値な変形を図や操作で確かめる。</span>
+            </a>
+          </div>
+          <div class="card-bottom"><span class="tag">数・式・方程式</span><span class="app-count">1 アプリ</span></div>
+        </section>
+
+        <section class="card field-card" data-category="vector">
+          <div class="card-top"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20V4M4 20h16"/><path d="m4 20 12-12m-5 0h5v5"/><path d="M4 20 9 8"/></svg></span><span class="num">06 / VEC</span></div>
+          <h3>ベクトル・座標</h3><p class="field-desc">位置や向きを数で表し、図形と式を行き来して関係を捉える。</p>
+          <div class="app-list">
+            <a class="app-link" href="#" target="_blank" rel="noopener noreferrer">
+              <span class="app-title">ベクトルの合成と分解 <span class="link-arrow">↗</span></span>
+              <span class="app-desc">ベクトルを動かし、成分や合成の意味を視覚化する。</span>
+            </a>
+          </div>
+          <div class="card-bottom"><span class="tag">座標・ベクトル</span><span class="app-count">1 アプリ</span></div>
+        </section>
+
+        <section class="card field-card" data-category="logic">
+          <div class="card-top"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/><path d="M12 7.1a6 6 0 0 1 0 9.8"/></svg></span><span class="num">07 / LOG</span></div>
+          <h3>論理・集合</h3><p class="field-desc">条件を整理し、命題のつながりや「成り立つ範囲」を可視化する。</p>
+          <div class="app-list">
+            <a class="app-link" href="#" target="_blank" rel="noopener noreferrer">
+              <span class="app-title">集合とベン図 <span class="link-arrow">↗</span></span>
+              <span class="app-desc">集合の条件を切り替え、共通部分や和集合を確認する。</span>
+            </a>
+          </div>
+          <div class="card-bottom"><span class="tag">集合・命題・論証</span><span class="app-count">1 アプリ</span></div>
+        </section>
+
+        <section class="card field-card" data-category="inquiry">
+          <div class="card-top"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M23 12h-3M12 23v-3M1 12h3"/></svg></span><span class="num">08 / LAB</span></div>
+          <h3>横断・探究</h3><p class="field-desc">分野の境界を越えて、予想・実験・比較から新しい問いをつくる。</p>
+          <div class="app-list">
+            <a class="app-link" href="#" target="_blank" rel="noopener noreferrer">
+              <span class="app-title">数学の自由研究ツール <span class="link-arrow">↗</span></span>
+              <span class="app-desc">予想を立て、条件を変えながら規則性を探る。</span>
+            </a>
+          </div>
+          <div class="card-bottom"><span class="tag">数学の見方・考え方</span><span class="app-count">1 アプリ</span></div>
+        </section>
+      </div>
+      <div class="empty" id="empty-message">この分野のシミュレーションは、これから追加していきます。</div>
+
+      
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap footer-inner">
+      <div><div class="footer-brand">シミュレーション置場</div><div class="copyright">動かして、試して、見つける。</div></div>
+      <div class="copyright">高校数学のインタラクティブ・シミュレーション</div>
+    </div>
+  </footer>
+  <script>
+    const buttons = document.querySelectorAll('.filter');
+    const cards = document.querySelectorAll('.field-card[data-category]');
+    const emptyMessage = document.getElementById('empty-message');
+    buttons.forEach(button => {
+      button.addEventListener('click', () => {
+        const filter = button.dataset.filter;
+        buttons.forEach(item => item.classList.toggle('active', item === button));
+        let visible = 0;
+        cards.forEach(card => {
+          const show = filter === 'all' || card.dataset.category === filter;
+          card.hidden = !show;
+          if (show) visible++;
+        });
+        emptyMessage.style.display = visible ? 'none' : 'block';
+      });
+    });
+
+    // URL未設定のリンク（href="#"）は、誤ってページ先頭へ移動しないようにする。
+    document.querySelectorAll('.app-link').forEach(link => {
+      link.addEventListener('click', event => {
+        if (!link.getAttribute('href') || link.getAttribute('href') === '#') {
+          event.preventDefault();
+          alert('このシミュレーションのURLは、index.html内の href="#" に設定してください。');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
