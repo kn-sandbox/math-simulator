@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>指数・対数 桁数と最高位・一の位の計算シミュレーター</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- MathJax for TeX rendering -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Noto Sans JP', 'Inter', sans-serif;
+        }
+        .tab-btn.active {
+            border-bottom-color: #3b82f6;
+            color: #2563eb;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-700 to-indigo-800 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <div class="flex items-center space-x-3">
+                <i data-lucide="calculator" class="w-8 h-8 text-amber-300"></i>
+                <div>
+                    <h1 class="text-xl font-bold leading-tight">桁数と最高位と一の位のシミュレーター</h1>
+                    <p class="text-xs text-blue-200">桁数・最高位の数・一の位の数の探究シミュレーター</p>
+                </div>
+            </div>
+            <!-- Navigation Tabs -->
+            <div class="flex space-x-1 bg-blue-900/50 p-1 rounded-xl text-sm">
+                <button id="tab-demo" onclick="switchTab('demo')" class="px-4 py-1.5 rounded-lg transition font-medium bg-white text-blue-900 shadow">
+                    問題調整
+                </button>
+                <button id="tab-quiz" onclick="switchTab('quiz')" class="px-4 py-1.5 rounded-lg transition font-medium text-blue-100 hover:text-white">
+                    演習
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <!-- DEMO SECTION -->
+        <div id="section-demo" class="space-y-6">
+
+            <!-- Control Card & Problem Statement -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Problem Statement Card (7 cols) - SWAPPED TO LEFT -->
+                <div class="lg:col-span-7 bg-gradient-to-br from-indigo-900 via-blue-900 to-slate-900 text-white p-6 rounded-2xl shadow-lg flex flex-col justify-between relative overflow-hidden">
+                    <div class="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
+                        <i data-lucide="hash" class="w-64 h-64 text-white"></i>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="inline-flex items-center gap-1.5 bg-amber-400/20 text-amber-300 text-xs font-bold px-3 py-1 rounded-full border border-amber-400/30">
+                            <i data-lucide="help-circle" class="w-3.5 h-3.5"></i> 問題
+                        </div>
+                        <div id="problem-text-container" class="text-lg sm:text-xl font-medium leading-relaxed">
+                            <!-- MathJax Problem Statement rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Quick Result Summary Badges -->
+                    <div class="grid grid-cols-3 gap-3 pt-6 border-t border-blue-800/60 mt-4">
+                        <div class="bg-blue-950/60 p-3 rounded-xl border border-blue-700/50 text-center">
+                            <span class="block text-xs text-blue-300 font-medium">整数 $n$ の値</span>
+                            <span id="summary-n" class="text-2xl font-black text-amber-400 font-mono">-</span>
+                        </div>
+                        <div class="bg-blue-950/60 p-3 rounded-xl border border-blue-700/50 text-center">
+                            <span class="block text-xs text-blue-300 font-medium">最高位の数字</span>
+                            <span id="summary-first" class="text-2xl font-black text-emerald-400 font-mono">-</span>
+                        </div>
+                        <div class="bg-blue-950/60 p-3 rounded-xl border border-blue-700/50 text-center">
+                            <span class="block text-xs text-blue-300 font-medium">一の位の数字</span>
+                            <span id="summary-last" class="text-2xl font-black text-rose-400 font-mono">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Panel (5 cols) - SWAPPED TO RIGHT -->
+                <div class="lg:col-span-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-5">
+                    <div class="flex items-center justify-between border-b pb-3 border-slate-100">
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="sliders" class="w-5 h-5 text-blue-600"></i>
+                            問題設定パラメーター
+                        </h2>
+                        <button onclick="resetDefaults()" class="text-xs text-blue-600 hover:text-blue-800 underline">標準値（48のn乗）に戻す</button>
+                    </div>
+
+                    <!-- Base Number (a) -->
+                    <div class="space-y-1">
+                        <label class="text-sm font-semibold text-slate-700 flex justify-between items-center">
+                            <span>底の数 $a$（正の整数）:</span>
+                            <div class="flex items-center gap-1">
+                                <input type="number" id="num-a" min="2" max="100" value="48" class="w-20 text-right border-2 border-slate-200 rounded-lg px-2 py-0.5 text-blue-600 font-bold focus:border-blue-500 focus:outline-none" oninput="syncFromNumber('a')">
+                            </div>
+                        </label>
+                        <input type="range" id="input-a" min="2" max="100" value="48" class="w-full accent-blue-600 cursor-pointer" oninput="syncFromRange('a')">
+                        <div class="flex justify-between text-xs text-slate-400">
+                            <span>2</span>
+                            <span>50</span>
+                            <span>100</span>
+                        </div>
+                    </div>
+
+                    <!-- Digit Count (k) -->
+                    <div class="space-y-1">
+                        <label class="text-sm font-semibold text-slate-700 flex justify-between items-center">
+                            <span>桁数 $k$ 桁:</span>
+                            <div class="flex items-center gap-1">
+                                <input type="number" id="num-k" min="5" max="300" value="167" class="w-20 text-right border-2 border-slate-200 rounded-lg px-2 py-0.5 text-indigo-600 font-bold focus:border-indigo-500 focus:outline-none" oninput="syncFromNumber('k')">
+                            </div>
+                        </label>
+                        <input type="range" id="input-k" min="5" max="300" value="167" class="w-full accent-indigo-600 cursor-pointer" oninput="syncFromRange('k')">
+                        <div class="flex justify-between text-xs text-slate-400">
+                            <span>5</span>
+                            <span>150</span>
+                            <span>300</span>
+                        </div>
+                    </div>
+
+                    <!-- Logarithm Approximations -->
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                        <p class="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                            <i data-lucide="database" class="w-3.5 h-3.5"></i> 常用対数の近似値 (常用対数表より)
+                        </p>
+                        <div class="grid grid-cols-3 gap-2 text-xs">
+                            <div>
+                                <span class="text-slate-500">$\log_{10} 2$:</span>
+                                <input type="number" id="log2-val" step="0.0001" value="0.3010" class="w-full mt-0.5 border rounded px-1.5 py-1 text-center font-mono bg-white" onchange="updateCalculations()">
+                            </div>
+                            <div>
+                                <span class="text-slate-500">$\log_{10} 3$:</span>
+                                <input type="number" id="log3-val" step="0.0001" value="0.4771" class="w-full mt-0.5 border rounded px-1.5 py-1 text-center font-mono bg-white" onchange="updateCalculations()">
+                            </div>
+                            <div>
+                                <span class="text-slate-500">$\log_{10} 7$:</span>
+                                <input type="number" id="log7-val" step="0.0001" value="0.8451" class="w-full mt-0.5 border rounded px-1.5 py-1 text-center font-mono bg-white" onchange="updateCalculations()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualizations Block -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                <!-- Visual 1: Digit Count & Logarithmic Range -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
+                    <div>
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2 mb-1">
+                            <i data-lucide="layers" class="w-5 h-5 text-indigo-500"></i>
+                            1. 桁数と対数スケール
+                        </h3>
+                        <p class="text-xs text-slate-500">整数が $k$ 桁 $\iff 10^{k-1} \le N < 10^k$</p>
+                    </div>
+
+                    <!-- Scale Graphic -->
+                    <div class="bg-slate-50 p-4 rounded-xl space-y-3">
+                        <div class="text-center text-xs text-slate-600 font-semibold" id="vis1-bound-text">
+                            $10^{166} \le 48^n < 10^{167}$
+                        </div>
+                        <div class="relative pt-6 pb-2">
+                            <!-- Track -->
+                            <div class="h-3 bg-slate-200 rounded-full w-full relative">
+                                <div id="vis1-progress" class="h-full bg-indigo-500 rounded-full transition-all duration-300" style="width: 50%;"></div>
+                            </div>
+                            <!-- Markers -->
+                            <div class="flex justify-between text-[11px] font-mono text-slate-500 mt-2">
+                                <span id="vis1-min-label">$10^{166}$</span>
+                                <span id="vis1-val-label" class="font-bold text-indigo-700">$a^n$</span>
+                                <span id="vis1-max-label">$10^{167}$</span>
+                            </div>
+                        </div>
+                        <div class="p-2.5 bg-indigo-50/80 rounded-lg border border-indigo-100 text-xs text-indigo-900 leading-relaxed" id="vis1-explanation">
+                            両辺の常用対数を取ると、<br>
+                            <span id="vis1-log-ineq" class="font-semibold"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visual 2: Highest Digit Determination -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
+                    <div>
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2 mb-1">
+                            <i data-lucide="bar-chart-2" class="w-5 h-5 text-emerald-500"></i>
+                            2. 最高位の数の特定（小数部分）
+                        </h3>
+                        <p class="text-xs text-slate-500">$\log_{10}(a^n)$ の小数部分 $r$ が属する範囲を判定</p>
+                    </div>
+
+                    <div class="bg-slate-50 p-4 rounded-xl space-y-3">
+                        <div class="text-center text-xs font-semibold text-slate-700">
+                            小数部分 $r = \log_{10}(a^n) - \lfloor \log_{10}(a^n) \rfloor \approx$ 
+                            <span id="vis2-r-val" class="text-emerald-600 font-bold font-mono">0.0000</span>
+                        </div>
+
+                        <!-- 1-10 Log Scale Visualizer -->
+                        <div class="relative pt-5 pb-6">
+                            <div class="h-4 bg-slate-200 rounded-lg w-full flex overflow-hidden text-[9px] font-bold text-white text-center leading-4">
+                                <!-- Colored sectors 1 to 9 -->
+                                <div style="width: 30.1%" class="bg-emerald-400 border-r border-white/40" title="1">1</div>
+                                <div style="width: 17.6%" class="bg-emerald-500 border-r border-white/40" title="2">2</div>
+                                <div style="width: 12.5%" class="bg-emerald-600 border-r border-white/40" title="3">3</div>
+                                <div style="width: 9.7%" class="bg-emerald-700 border-r border-white/40" title="4">4</div>
+                                <div style="width: 7.9%" class="bg-teal-600 border-r border-white/40" title="5">5</div>
+                                <div style="width: 6.7%" class="bg-teal-700 border-r border-white/40" title="6">6</div>
+                                <div style="width: 5.8%" class="bg-teal-800 border-r border-white/40" title="7">7</div>
+                                <div style="width: 5.1%" class="bg-cyan-800 border-r border-white/40" title="8">8</div>
+                                <div style="width: 4.6%" class="bg-slate-700" title="9">9</div>
+                            </div>
+                            <!-- Pointer -->
+                            <div id="vis2-pointer" class="absolute top-1 transform -translate-x-1/2 transition-all duration-300 flex flex-col items-center" style="left: 0%;">
+                                <div id="vis2-badge" class="bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow">r</div>
+                                <div class="w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-emerald-600"></div>
+                            </div>
+                        </div>
+
+                        <div id="vis2-bounds-text" class="text-xs p-2.5 bg-emerald-50/80 rounded-lg border border-emerald-100 text-emerald-900 leading-relaxed font-mono">
+                            <!-- Interval info rendered here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visual 3: Last Digit Cycle -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
+                    <div>
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2 mb-1">
+                            <i data-lucide="rotate-cw" class="w-5 h-5 text-rose-500"></i>
+                            3. 一の位の周期性
+                        </h3>
+                        <p class="text-xs text-slate-500">一の位の掛算サイクル: $a \pmod{10}$ の累乗</p>
+                    </div>
+
+                    <div class="bg-slate-50 p-4 rounded-xl space-y-3">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-600">一の位の基底: <b id="vis3-base-digit" class="text-slate-800">8</b></span>
+                            <span class="text-slate-600">周期: <b id="vis3-cycle-len" class="text-rose-600">4</b></span>
+                        </div>
+
+                        <!-- Cycle Badge Chain -->
+                        <div id="vis3-cycle-chain" class="flex justify-center gap-2 py-2">
+                            <!-- Generated dynamically -->
+                        </div>
+
+                        <div id="vis3-calc-text" class="text-xs p-2.5 bg-rose-50/80 rounded-lg border border-rose-100 text-rose-900 leading-relaxed">
+                            <!-- Modulo calculation info -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Full Mathematical Step-by-Step Breakdown -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+                <h3 class="text-lg font-bold text-slate-800 border-b pb-3 flex items-center gap-2">
+                    <i data-lucide="book-open" class="w-5 h-5 text-blue-600"></i>
+                    詳細ステップ解説（記述模範解答）
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    <!-- Step 1 & 2 -->
+                    <div class="space-y-6">
+                        <!-- Step 1 -->
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-blue-100 text-blue-700 font-bold text-xs px-2.5 py-1 rounded-full">Step 1</span>
+                                <h4 class="font-bold text-slate-800 text-sm">桁数の条件から不等式を立てる</h4>
+                            </div>
+                            <div id="step1-math" class="bg-slate-50 p-4 rounded-xl text-sm leading-relaxed overflow-x-auto">
+                                <!-- Rendered MathJax -->
+                            </div>
+                        </div>
+
+                        <!-- Step 2 -->
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-indigo-100 text-indigo-700 font-bold text-xs px-2.5 py-1 rounded-full">Step 2</span>
+                                <h4 class="font-bold text-slate-800 text-sm">整数 $n$ の値を決定する</h4>
+                            </div>
+                            <div id="step2-math" class="bg-slate-50 p-4 rounded-xl text-sm leading-relaxed overflow-x-auto">
+                                <!-- Rendered MathJax -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 & 4 -->
+                    <div class="space-y-6">
+                        <!-- Step 3 -->
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-emerald-100 text-emerald-700 font-bold text-xs px-2.5 py-1 rounded-full">Step 3</span>
+                                <h4 class="font-bold text-slate-800 text-sm">最高位の数を求める（小数部分の評価）</h4>
+                            </div>
+                            <div id="step3-math" class="bg-slate-50 p-4 rounded-xl text-sm leading-relaxed overflow-x-auto">
+                                <!-- Rendered MathJax -->
+                            </div>
+                        </div>
+
+                        <!-- Step 4 -->
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-rose-100 text-rose-700 font-bold text-xs px-2.5 py-1 rounded-full">Step 4</span>
+                                <h4 class="font-bold text-slate-800 text-sm">一の位の数を求める（周期の利用）</h4>
+                            </div>
+                            <div id="step4-math" class="bg-slate-50 p-4 rounded-xl text-sm leading-relaxed overflow-x-auto">
+                                <!-- Rendered MathJax -->
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- QUIZ SECTION -->
+        <div id="section-quiz" class="hidden space-y-6">
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto space-y-6">
+                <div class="flex items-center justify-between border-b pb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="award" class="w-6 h-6 text-amber-500"></i>
+                            演習
+                        </h2>
+                        <p class="text-xs text-slate-500">ランダムに生成される問題に挑戦して理解度をテストしましょう</p>
+                    </div>
+                    <button onclick="generateQuizProblem()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow flex items-center gap-1.5">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i> 新しい問題を生成
+                    </button>
+                </div>
+
+                <!-- Generated Question Card -->
+                <div class="bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-6 rounded-xl space-y-3">
+                    <span class="text-xs font-bold text-amber-400 uppercase tracking-widest">問題</span>
+                    <div id="quiz-question-text" class="text-lg font-medium">
+                        <!-- MathJax Problem Question -->
+                    </div>
+                    <p class="text-xs text-slate-400 pt-2 border-t border-slate-800">
+                        ※ただし、必要に応じて $\log_{10} 2 = 0.3010$, $\log_{10} 3 = 0.4771$, $\log_{10} 7 = 0.8451$ とする。
+                    </p>
+                </div>
+
+                <!-- Input Answers Form -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-bold text-slate-700">1. 自然数 $n$ の値:</label>
+                        <input type="number" id="quiz-ans-n" placeholder="例: 99" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-center font-bold text-slate-800 focus:border-blue-500 focus:outline-none">
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-bold text-slate-700">2. 最高位の数:</label>
+                        <input type="number" id="quiz-ans-first" placeholder="1〜9" min="1" max="9" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-center font-bold text-slate-800 focus:border-blue-500 focus:outline-none">
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-bold text-slate-700">3. 一の位の数:</label>
+                        <input type="number" id="quiz-ans-last" placeholder="0〜9" min="0" max="9" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 text-center font-bold text-slate-800 focus:border-blue-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Submit & Feedback -->
+                <div class="space-y-4 pt-2">
+                    <button onclick="checkQuizAnswer()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow-md transition flex justify-center items-center gap-2">
+                        <i data-lucide="check-circle-2" class="w-5 h-5"></i> 答え合わせをする
+                    </button>
+
+                    <!-- Feedback Box -->
+                    <div id="quiz-feedback" class="hidden p-4 rounded-xl border">
+                        <!-- Dynamic Result Rendered Here -->
+                    </div>
+                </div>
+
+                <!-- Hint / Solution Toggle -->
+                <div class="pt-4 border-t">
+                    <button onclick="toggleQuizSolution()" class="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1">
+                        <i data-lucide="chevron-down" id="solution-chevron" class="w-4 h-4"></i> 解説・解答を表示する
+                    </button>
+                    <div id="quiz-solution-box" class="hidden mt-3 p-4 bg-slate-50 rounded-xl text-sm space-y-2 border border-slate-200">
+                        <!-- Rendered Math Solution -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+        高校数学Ⅱ 指数関数・対数関数 桁数探究学習ツール
+    </footer>
+
+    <script>
+        // State variables for Demo Mode
+        let state = {
+            a: 48,
+            k: 167,
+            log2: 0.3010,
+            log3: 0.4771,
+            log7: 0.8451,
+            calc: {}
+        };
+
+        // Quiz State
+        let currentQuiz = null;
+
+        // Synchronize Range Slider -> Number Input & Calculations
+        function syncFromRange(param) {
+            if (param === 'a') {
+                const val = document.getElementById('input-a').value;
+                document.getElementById('num-a').value = val;
+            } else if (param === 'k') {
+                const val = document.getElementById('input-k').value;
+                document.getElementById('num-k').value = val;
+            }
+            updateCalculations();
+        }
+
+        // Synchronize Number Input -> Range Slider & Calculations
+        function syncFromNumber(param) {
+            if (param === 'a') {
+                let val = parseInt(document.getElementById('num-a').value);
+                if (isNaN(val)) return;
+                val = Math.max(2, Math.min(100, val));
+                document.getElementById('input-a').value = val;
+            } else if (param === 'k') {
+                let val = parseInt(document.getElementById('num-k').value);
+                if (isNaN(val)) return;
+                val = Math.max(5, Math.min(300, val));
+                document.getElementById('input-k').value = val;
+            }
+            updateCalculations();
+        }
+
+        // Initialize Lucide Icons
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            updateCalculations();
+        });
+
+        // Tab Switcher
+        function switchTab(tab) {
+            const demoSec = document.getElementById('section-demo');
+            const quizSec = document.getElementById('section-quiz');
+            const btnDemo = document.getElementById('tab-demo');
+            const btnQuiz = document.getElementById('tab-quiz');
+
+            if (tab === 'demo') {
+                demoSec.classList.remove('hidden');
+                quizSec.classList.add('hidden');
+                btnDemo.className = "px-4 py-1.5 rounded-lg transition font-medium bg-white text-blue-900 shadow";
+                btnQuiz.className = "px-4 py-1.5 rounded-lg transition font-medium text-blue-100 hover:text-white";
+            } else {
+                demoSec.classList.add('hidden');
+                quizSec.classList.remove('hidden');
+                btnQuiz.className = "px-4 py-1.5 rounded-lg transition font-medium bg-white text-blue-900 shadow";
+                btnDemo.className = "px-4 py-1.5 rounded-lg transition font-medium text-blue-100 hover:text-white";
+                if (!currentQuiz) {
+                    generateQuizProblem();
+                }
+            }
+        }
+
+        function resetDefaults() {
+            document.getElementById('input-a').value = 48;
+            document.getElementById('num-a').value = 48;
+            document.getElementById('input-k').value = 167;
+            document.getElementById('num-k').value = 167;
+            document.getElementById('log2-val').value = 0.3010;
+            document.getElementById('log3-val').value = 0.4771;
+            document.getElementById('log7-val').value = 0.8451;
+            updateCalculations();
+        }
+
+        // Compute prime factorization of a and log10(a) using log values
+        function calculateLogA(a, log2, log3, log7) {
+            let temp = a;
+            let count2 = 0, count3 = 0, count7 = 0;
+
+            while (temp % 2 === 0) { count2++; temp /= 2; }
+            while (temp % 3 === 0) { count3++; temp /= 3; }
+            while (temp % 7 === 0) { count7++; temp /= 7; }
+
+            // If a contains factors other than 2, 3, 7 or remainder > 1, use Math.log10 directly for accuracy
+            let logVal = 0;
+            let decompTex = "";
+
+            if (temp === 1) {
+                logVal = count2 * log2 + count3 * log3 + count7 * log7;
+                let parts = [];
+                if (count2 > 0) parts.push(count2 === 1 ? "2" : `2^{${count2}}`);
+                if (count3 > 0) parts.push(count3 === 1 ? "3" : `3^{${count3}}`);
+                if (count7 > 0) parts.push(count7 === 1 ? "7" : `7^{${count7}}`);
+                
+                let logParts = [];
+                if (count2 > 0) logParts.push(`${count2 > 1 ? count2 + ' ' : ''}\\log_{10} 2`);
+                if (count3 > 0) logParts.push(`${count3 > 1 ? count3 + ' ' : ''}\\log_{10} 3`);
+                if (count7 > 0) logParts.push(`${count7 > 1 ? count7 + ' ' : ''}\\log_{10} 7`);
+
+                decompTex = `${a} = ${parts.join('\\cdot ')}`;
+                var logExprTex = `\\log_{10} ${a} = ${logParts.join(' + ')}`;
+            } else {
+                logVal = Math.log10(a);
+                decompTex = `${a}`;
+                var logExprTex = `\\log_{10} ${a} \\approx ${logVal.toFixed(4)}`;
+            }
+
+            return {
+                logVal: parseFloat(logVal.toFixed(5)),
+                decompTex,
+                logExprTex
+            };
+        }
+
+        // Main Calculation Engine
+        function solveProblem(a, k, log2, log3, log7) {
+            const logAData = calculateLogA(a, log2, log3, log7);
+            const logA = logAData.logVal;
+
+            // Step 1 & 2: Range for n
+            // 10^(k-1) <= a^n < 10^k  =>  k-1 <= n * log10(a) < k
+            // (k-1)/log10(a) <= n < k/log10(a)
+            const minN = (k - 1) / logA;
+            const maxN = k / logA;
+
+            // Find integer n in range [minN, maxN)
+            let n = -1;
+            for (let candidate = Math.ceil(minN); candidate <= Math.floor(maxN); candidate++) {
+                if (candidate * logA >= (k - 1) && candidate * logA < k) {
+                    n = candidate;
+                    break;
+                }
+            }
+            if (n === -1) {
+                // Fallback in case floating point boundary alignment
+                n = Math.round((k - 0.5) / logA);
+            }
+
+            // Step 3: Highest Digit
+            const logAn = n * logA;
+            const frac = logAn - Math.floor(logAn); // fractional part r
+
+            // Find digit d such that log10(d) <= r < log10(d+1)
+            let firstDigit = 1;
+            let lowerLog = 0;
+            let upperLog = 0;
+
+            for (let d = 1; d <= 9; d++) {
+                let l1 = Math.log10(d);
+                let l2 = Math.log10(d + 1);
+                // Adjust using explicit standard values if applicable
+                if (d === 2) l1 = log2;
+                if (d === 3) l1 = log3;
+                if (d === 4) l1 = 2 * log2;
+                if (d === 5) l1 = 1 - log2;
+                if (d === 6) l1 = log2 + log3;
+                if (d === 7) l1 = log7;
+                if (d === 8) l1 = 3 * log2;
+                if (d === 9) l1 = 2 * log3;
+
+                if (d + 1 === 2) l2 = log2;
+                if (d + 1 === 3) l2 = log3;
+                if (d + 1 === 4) l2 = 2 * log2;
+                if (d + 1 === 5) l2 = 1 - log2;
+                if (d + 1 === 6) l2 = log2 + log3;
+                if (d + 1 === 7) l2 = log7;
+                if (d + 1 === 8) l2 = 3 * log2;
+                if (d + 1 === 9) l2 = 2 * log3;
+                if (d + 1 === 10) l2 = 1.0;
+
+                if (frac >= l1 - 0.00001 && frac < l2 - 0.00001) {
+                    firstDigit = d;
+                    lowerLog = l1;
+                    upperLog = l2;
+                    break;
+                }
+            }
+
+            // Step 4: Last Digit Cycle
+            const lastDigitBase = a % 10;
+            let cycle = [];
+            let current = lastDigitBase;
+            while (!cycle.includes(current)) {
+                cycle.push(current);
+                current = (current * lastDigitBase) % 10;
+            }
+            const cycleLen = cycle.length;
+            const remainder = n % cycleLen;
+            const lastDigit = cycle[(remainder === 0 ? cycleLen : remainder) - 1];
+
+            return {
+                a, k, n, logA,
+                logAData,
+                minN, maxN,
+                logAn, frac,
+                firstDigit, lowerLog, upperLog,
+                lastDigitBase, cycle, cycleLen, remainder, lastDigit
+            };
+        }
+
+        function updateCalculations() {
+            state.a = parseInt(document.getElementById('input-a').value) || 48;
+            state.k = parseInt(document.getElementById('input-k').value) || 167;
+            state.log2 = parseFloat(document.getElementById('log2-val').value) || 0.3010;
+            state.log3 = parseFloat(document.getElementById('log3-val').value) || 0.4771;
+            state.log7 = parseFloat(document.getElementById('log7-val').value) || 0.8451;
+
+            // Solve
+            const res = solveProblem(state.a, state.k, state.log2, state.log3, state.log7);
+            state.calc = res;
+
+            // Update Summary Badges
+            document.getElementById('summary-n').innerText = `n = ${res.n}`;
+            document.getElementById('summary-first').innerText = res.firstDigit;
+            document.getElementById('summary-last').innerText = res.lastDigit;
+
+            // Update Main Question
+            document.getElementById('problem-text-container').innerHTML = 
+                `$${res.a}^n$ が $${res.k}$ 桁の整数であるとき、自然数 $n$ の値、および $${res.a}^n$ の最高位の数字と一の位の数字を求めよ。`;
+
+            // Visual 1 Updates
+            document.getElementById('vis1-bound-text').innerHTML = `$10^{${res.k - 1}} \\le ${res.a}^n < 10^{${res.k}}$`;
+            document.getElementById('vis1-min-label').innerHTML = `$10^{${res.k - 1}}$`;
+            document.getElementById('vis1-max-label').innerHTML = `$10^{${res.k}}$`;
+            document.getElementById('vis1-val-label').innerHTML = `$${res.a}^{${res.n}}$`;
+            document.getElementById('vis1-log-ineq').innerHTML = `${res.k - 1} \\le ${res.n} \\log_{10} ${res.a} < ${res.k}`;
+
+            // Visual 2 Updates
+            document.getElementById('vis2-r-val').innerText = res.frac.toFixed(4);
+            const pointerPercent = Math.min(Math.max(res.frac * 100, 0), 100);
+            document.getElementById('vis2-pointer').style.left = `${pointerPercent}%`;
+            document.getElementById('vis2-badge').innerText = `r=${res.frac.toFixed(3)}`;
+            document.getElementById('vis2-bounds-text').innerHTML = 
+                `$\\log_{10} ${res.firstDigit} (${res.lowerLog.toFixed(4)}) \\le ${res.frac.toFixed(4)} < \\log_{10} ${res.firstDigit + 1} (${res.upperLog.toFixed(4)})$<br>` +
+                `したがって最高位の数字は <b class="text-emerald-700 font-bold">${res.firstDigit}</b> です。`;
+
+            // Visual 3 Updates
+            document.getElementById('vis3-base-digit').innerText = res.lastDigitBase;
+            document.getElementById('vis3-cycle-len').innerText = `${res.cycleLen} (周期)`;
+            
+            const chainContainer = document.getElementById('vis3-cycle-chain');
+            chainContainer.innerHTML = res.cycle.map((num, idx) => {
+                const isActive = (idx === ((res.remainder === 0 ? res.cycleLen : res.remainder) - 1));
+                return `<div class="px-3 py-1.5 rounded-lg border text-sm font-bold font-mono transition ${isActive ? 'bg-rose-500 text-white border-rose-600 shadow-md scale-110' : 'bg-white text-slate-700 border-slate-300'}">
+                    ${num}
+                </div>`;
+            }).join('<i data-lucide="arrow-right" class="w-4 h-4 text-slate-400 self-center"></i>');
+            lucide.createIcons();
+
+            document.getElementById('vis3-calc-text').innerHTML = 
+                `指数 $n = ${res.n}$ を周期 ${res.cycleLen} で割ると、<br>` +
+                `$${res.n} = ${res.cycleLen} \\times ${Math.floor(res.n / res.cycleLen)} + ${res.remainder}$ (余り ${res.remainder})<br>` +
+                `周期の ${res.remainder === 0 ? res.cycleLen : res.remainder} 番目の数 $\\rightarrow$ <b>${res.lastDigit}</b>`;
+
+            // Step-by-Step Breakdown Render
+            document.getElementById('step1-math').innerHTML = 
+                `$${res.a}^n$ が $${res.k}$ 桁の整数であることから、<br>` +
+                `$$10^{${res.k - 1}} \\le ${res.a}^n < 10^{${res.k}}$$` +
+                `常用対数を取ると、<br>` +
+                `$$${res.k - 1} \\le n \\log_{10} ${res.a} < ${res.k} \\quad \\cdots (1)$$`;
+
+            document.getElementById('step2-math').innerHTML = 
+                `ここで、${res.logAData.decompTex} より、<br>` +
+                `$$${res.logAData.logExprTex} \\approx ${res.logA}$$` +
+                `(1) 式より、$${res.k - 1} \\le ${res.logA} n < ${res.k}$ であるから、<br>` +
+                `$$\\frac{${res.k - 1}}{${res.logA}} \\le n < \\frac{${res.k}}{${res.logA}}$$` +
+                `$$${res.minN.toFixed(3)} \\le n < ${res.maxN.toFixed(3)}$<br>` +
+                `これを満たす自然数 $n$ は、<b class="text-indigo-600 font-bold">n = ${res.n}</b> です。`;
+
+            document.getElementById('step3-math').innerHTML = 
+                `$n = ${res.n}$ のとき、$\\log_{10} ${res.a}^{${res.n}} = ${res.n} \\log_{10} ${res.a}$ を計算すると、<br>` +
+                `$$\\log_{10} ${res.a}^{${res.n}} = ${res.n} \\times ${res.logA} = ${res.logAn.toFixed(4)}$$` +
+                `整数部分が $${Math.floor(res.logAn)}$、小数部分 $r = ${res.frac.toFixed(4)}$ となります。<br>` +
+                `$\\log_{10} ${res.firstDigit} = ${res.lowerLog.toFixed(4)}$, $\\log_{10} ${res.firstDigit + 1} = ${res.upperLog.toFixed(4)}$ より、<br>` +
+                `$$\\log_{10} ${res.firstDigit} \\le ${res.frac.toFixed(4)} < \\log_{10} ${res.firstDigit + 1}$$` +
+                `$$${res.firstDigit} \\times 10^{${Math.floor(res.logAn)}} \\le ${res.a}^{${res.n}} < ${res.firstDigit + 1} \\times 10^{${Math.floor(res.logAn)}}$$` +
+                `よって、最高位の数字は <b class="text-emerald-600 font-bold">${res.firstDigit}</b> です。`;
+
+            document.getElementById('step4-math').innerHTML = 
+                `$${res.a}$ の一の位の数字は $${res.lastDigitBase}$ です。<br>` +
+                `$${res.lastDigitBase}$ の累乗の一の位は、` +
+                `$[${res.cycle.join(', ')}]$ の ${res.cycleLen} 項の周期で繰り返します。<br>` +
+                `指数 $n = ${res.n}$ について、<br>` +
+                `$$${res.n} = ${res.cycleLen} \\times ${Math.floor(res.n / res.cycleLen)} + ${res.remainder}$$` +
+                `余りが $${res.remainder}$ であるため、周期の ${res.remainder === 0 ? res.cycleLen : res.remainder} 番目の数字となります。<br>` +
+                `よって、一の位の数字は <b class="text-rose-600 font-bold">${res.lastDigit}</b> です。`;
+
+            // Trigger MathJax Typesetting
+            if (window.MathJax && MathJax.typesetPromise) {
+                MathJax.typesetPromise();
+            }
+        }
+
+        function generateQuizProblem() {
+            // Pick a good interactive pair
+            const sampleBases = [12, 18, 24, 28, 36, 45, 54];
+            const randomA = sampleBases[Math.floor(Math.random() * sampleBases.length)];
+            const randomK = Math.floor(Math.random() * 80) + 30; // 30 ~ 110 digits
+
+            const solution = solveProblem(randomA, randomK, 0.3010, 0.4771, 0.8451);
+            currentQuiz = solution;
+
+            // Clear Inputs
+            document.getElementById('quiz-ans-n').value = '';
+            document.getElementById('quiz-ans-first').value = '';
+            document.getElementById('quiz-ans-last').value = '';
+
+            // Hide Feedback & Solution
+            const fb = document.getElementById('quiz-feedback');
+            fb.classList.add('hidden');
+            document.getElementById('quiz-solution-box').classList.add('hidden');
+
+            // Render Question Text
+            document.getElementById('quiz-question-text').innerHTML = 
+                `$${solution.a}^n$ が $${solution.k}$ 桁の整数であるとき、自然数 $n$ の値、最高位の数字、および一の位の数字を求めよ。`;
+
+            if (window.MathJax && MathJax.typesetPromise) {
+                MathJax.typesetPromise();
+            }
+        }
+
+        function checkQuizAnswer() {
+            if (!currentQuiz) return;
+
+            const userN = parseInt(document.getElementById('quiz-ans-n').value);
+            const userFirst = parseInt(document.getElementById('quiz-ans-first').value);
+            const userLast = parseInt(document.getElementById('quiz-ans-last').value);
+
+            const fb = document.getElementById('quiz-feedback');
+            fb.classList.remove('hidden');
+
+            const isNCorrect = userN === currentQuiz.n;
+            const isFirstCorrect = userFirst === currentQuiz.firstDigit;
+            const isLastCorrect = userLast === currentQuiz.lastDigit;
+
+            const allCorrect = isNCorrect && isFirstCorrect && isLastCorrect;
+
+            if (allCorrect) {
+                fb.className = "p-4 rounded-xl border bg-emerald-50 border-emerald-200 text-emerald-900 space-y-2";
+                fb.innerHTML = `
+                    <div class="flex items-center gap-2 font-bold text-emerald-700 text-base">
+                        <i data-lucide="party-popper" class="w-5 h-5"></i> 正解です！素晴らしい！
+                    </div>
+                    <p class="text-xs">すべての問題（nの値、最高位の数字、一の位の数字）に正しく答えられました。</p>
+                `;
+            } else {
+                fb.className = "p-4 rounded-xl border bg-rose-50 border-rose-200 text-rose-900 space-y-2";
+                fb.innerHTML = `
+                    <div class="flex items-center gap-2 font-bold text-rose-700 text-base">
+                        <i data-lucide="x-circle" class="w-5 h-5"></i> おしい！判定結果をご確認ください：
+                    </div>
+                    <ul class="text-xs space-y-1 list-disc list-inside">
+                        <li>$n$ の値: ${isNCorrect ? '<span class="text-emerald-600 font-bold">正解</span>' : '<span class="text-rose-600 font-bold">不正解</span> (正解: ' + currentQuiz.n + ')'}</li>
+                        <li>最高位の数字: ${isFirstCorrect ? '<span class="text-emerald-600 font-bold">正解</span>' : '<span class="text-rose-600 font-bold">不正解</span> (正解: ' + currentQuiz.firstDigit + ')'}</li>
+                        <li>一の位の数字: ${isLastCorrect ? '<span class="text-emerald-600 font-bold">正解</span>' : '<span class="text-rose-600 font-bold">不正解</span> (正解: ' + currentQuiz.lastDigit + ')'}</li>
+                    </ul>
+                `;
+            }
+
+            lucide.createIcons();
+            if (window.MathJax && MathJax.typesetPromise) {
+                MathJax.typesetPromise();
+            }
+        }
+
+        function toggleQuizSolution() {
+            const solBox = document.getElementById('quiz-solution-box');
+            const isHidden = solBox.classList.contains('hidden');
+
+            if (isHidden) {
+                solBox.classList.remove('hidden');
+                solBox.innerHTML = `
+                    <p class="font-bold text-slate-800 border-b pb-1">解答・解説:</p>
+                    <p><b>自然数 $n$:</b> $10^{${currentQuiz.k - 1}} \\le ${currentQuiz.a}^n < 10^{${currentQuiz.k}}$ より、常用対数を取って $n = ${currentQuiz.n}$</p>
+                    <p><b>最高位の数:</b> $\\log_{10} ${currentQuiz.a}^{${currentQuiz.n}} = ${currentQuiz.logAn.toFixed(4)}$。小数部分 $r = ${currentQuiz.frac.toFixed(4)}$ は $\\log_{10} ${currentQuiz.firstDigit} \\le r < \\log_{10} ${currentQuiz.firstDigit + 1}$ の範囲にあるため <b>${currentQuiz.firstDigit}</b></p>
+                    <p><b>一の位の数:</b> $${currentQuiz.a}$ の一の位 $${currentQuiz.lastDigitBase}$ の周期 $[${currentQuiz.cycle.join(', ')}]$ より $n \\pmod{${currentQuiz.cycleLen}} = ${currentQuiz.remainder}$ となるため <b>${currentQuiz.lastDigit}</b></p>
+                `;
+                if (window.MathJax && MathJax.typesetPromise) {
+                    MathJax.typesetPromise();
+                }
+            } else {
+                solBox.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
