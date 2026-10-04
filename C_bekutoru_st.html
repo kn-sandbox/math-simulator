@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ベクトルと点Pの存在範囲シミュレータ</title>
+    <!-- Tailwind CSS for modern responsive UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+        
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+
+        canvas {
+            touch-action: none;
+            background-color: #ffffff;
+        }
+
+        /* Vector Arrow Overline styling for HTML math text */
+        .v {
+            position: relative;
+            display: inline-block;
+            padding-top: 0.2em;
+        }
+        .v::before {
+            content: "→";
+            position: absolute;
+            top: -0.45em;
+            left: 50%;
+            transform: translateX(-50%) scaleX(0.85);
+            font-size: 0.75em;
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden bg-slate-50">
+
+    <!-- Header Navigation -->
+    <header class="bg-indigo-600 text-white px-5 py-3 flex justify-between items-center shadow-md z-10 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-indigo-700/60 rounded-xl border border-indigo-400/30">
+                <i class="fa-solid fa-draw-polygon text-xl text-indigo-100"></i>
+            </div>
+            <div>
+                <h1 class="text-base font-bold leading-tight flex items-center gap-2">
+                    高校数学 Vector Lab
+                    <span class="text-xs font-normal bg-indigo-500/50 px-2.5 py-0.5 rounded text-indigo-100 border border-indigo-300/30 font-mono">
+                        <span class="v">OP</span> = s<span class="v">OA</span> + t<span class="v">OB</span>
+                    </span>
+                </h1>
+                <p class="text-[11px] text-indigo-200">係数 s, t の条件と点Pの存在領域インタラクティブ視覚化ツール</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button id="reset-all-btn" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg font-medium text-xs shadow-md transition flex items-center gap-1.5 active:scale-95">
+                <i class="fa-solid fa-rotate-left"></i> 初期状態（単位ベクトル）に戻す
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+
+        <!-- Canvas Area -->
+        <div class="flex-1 relative flex flex-col bg-white overflow-hidden min-h-[380px]">
+            
+            <!-- Top Left Floating Display: Vector Coordinates -->
+            <div class="absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none">
+                <div class="bg-white/95 backdrop-blur-md text-slate-800 px-4 py-3 rounded-2xl border border-slate-200 text-xs shadow-xl space-y-1.5">
+                    <div class="font-bold text-indigo-600 flex items-center gap-1.5 pb-1 border-b border-slate-100">
+                        <i class="fa-solid fa-compass"></i> ベクトルの座標
+                    </div>
+                    <div class="pt-0.5 font-mono text-[12px] space-y-1">
+                        <div><span class="v font-bold text-rose-500">OA</span> = (<span id="vector-a-val">1.00, 0.00</span>)</div>
+                        <div><span class="v font-bold text-sky-500">OB</span> = (<span id="vector-b-val">0.00, 1.00</span>)</div>
+                        <div class="text-emerald-600 font-bold"><span class="v">OP</span> = (<span id="vector-p-val">0.50, 0.50</span>)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Right Canvas View Mode Controls -->
+            <div class="absolute top-4 right-4 z-10 flex gap-2">
+                <button id="reset-view-btn" class="bg-white/90 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-200 text-xs transition flex items-center gap-1.5 shadow-md active:scale-95">
+                    <i class="fa-solid fa-arrows-to-dot text-indigo-500"></i> 原点に戻す
+                </button>
+                <button id="toggle-grid-btn" class="bg-white/90 hover:bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl border border-slate-200 text-xs transition flex items-center gap-1.5 shadow-md active:scale-95">
+                    <i class="fa-solid fa-border-all text-indigo-500"></i> 格子切替
+                </button>
+            </div>
+
+            <!-- Bottom Right Zoom Floating Controls -->
+            <div class="absolute bottom-16 right-4 z-10 flex flex-col gap-1.5 bg-white/90 p-1.5 rounded-2xl border border-slate-200 shadow-xl backdrop-blur">
+                <button id="zoom-in-btn" class="w-8 h-8 rounded-xl hover:bg-slate-100 text-slate-700 flex items-center justify-center transition active:scale-90" title="拡大 (+)">
+                    <i class="fa-solid fa-plus text-sm"></i>
+                </button>
+                <div class="w-full h-px bg-slate-200"></div>
+                <button id="zoom-out-btn" class="w-8 h-8 rounded-xl hover:bg-slate-100 text-slate-700 flex items-center justify-center transition active:scale-90" title="縮小 (-)">
+                    <i class="fa-solid fa-minus text-sm"></i>
+                </button>
+            </div>
+
+            <!-- Main Canvas Element -->
+            <canvas id="sim-canvas" class="w-full h-full cursor-crosshair"></canvas>
+
+            <!-- Bottom Explanation Banner -->
+            <div id="explanation-box" class="bg-slate-900 text-white px-4 py-3 text-xs flex flex-wrap items-center justify-between gap-2 z-10 shadow-lg">
+                <div class="flex items-center gap-2">
+                    <span class="bg-indigo-500 text-white px-2 py-0.5 rounded font-bold shrink-0">図形的判定</span>
+                    <span id="explanation-text" class="text-slate-200">条件を満たす領域が表示されています。</span>
+                </div>
+                <div id="p-status-badge" class="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 shrink-0">
+                    <i class="fa-solid fa-circle-check"></i> 点Pは領域内
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Right Controls Panel -->
+        <div class="w-full md:w-96 bg-white border-l border-slate-200 flex flex-col h-full overflow-y-auto shadow-xl z-10">
+            
+            <!-- Tab Headers -->
+            <div class="flex border-b border-slate-200 bg-slate-50/80 text-xs font-semibold">
+                <button id="tab-custom" class="flex-1 py-3 border-b-2 border-indigo-600 text-indigo-600 bg-white transition flex justify-center items-center gap-1.5">
+                    <i class="fa-solid fa-sliders"></i> 自由設定
+                </button>
+                <button id="tab-preset" class="flex-1 py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition flex justify-center items-center gap-1.5">
+                    <i class="fa-solid fa-bookmark"></i> 典型パターン
+                </button>
+                <button id="tab-exercise" class="flex-1 py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition flex justify-center items-center gap-1.5">
+                    <i class="fa-solid fa-dice text-amber-500"></i> 演習問題(ランダム)
+                </button>
+            </div>
+
+            <!-- Tab Content Area -->
+            <div class="p-4 space-y-5 flex-1">
+
+                <!-- 1. Custom Tab -->
+                <div id="panel-custom" class="space-y-4">
+                    
+                    <div class="text-xs text-slate-500 flex justify-between items-center bg-slate-100/70 p-2.5 rounded-xl border border-slate-200">
+                        <span><i class="fa-solid fa-info-circle text-indigo-500 mr-1"></i> 点 A, B, O は画面上で直接ドラッグ移動できます。</span>
+                    </div>
+
+                    <!-- Equality Constraint: as + bt = c -->
+                    <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-bold text-slate-800 flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="eq-enable" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                直線等式: as + bt = c
+                            </label>
+                            <span class="text-[11px] bg-white px-2 py-0.5 rounded border border-slate-200 font-mono font-bold text-indigo-600" id="eq-preview">s + t = 1</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-xs pt-1">
+                            <div class="bg-white p-2 rounded-xl border border-slate-200">
+                                <span class="text-slate-500 text-[10px] block">a = <span id="a-val" class="text-slate-800 font-bold">1</span></span>
+                                <input type="range" id="param-a" min="-4" max="4" step="0.5" value="1" class="w-full accent-indigo-600 mt-1">
+                            </div>
+                            <div class="bg-white p-2 rounded-xl border border-slate-200">
+                                <span class="text-slate-500 text-[10px] block">b = <span id="b-val" class="text-slate-800 font-bold">1</span></span>
+                                <input type="range" id="param-b" min="-4" max="4" step="0.5" value="1" class="w-full accent-indigo-600 mt-1">
+                            </div>
+                            <div class="bg-white p-2 rounded-xl border border-slate-200">
+                                <span class="text-slate-500 text-[10px] block">c = <span id="c-val" class="text-slate-800 font-bold">1</span></span>
+                                <input type="range" id="param-c" min="-4" max="4" step="0.5" value="1" class="w-full accent-indigo-600 mt-1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Non-negativity Constraints -->
+                    <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2 shadow-sm">
+                        <div class="text-xs font-bold text-slate-800">非負条件 (象限限定)</div>
+                        <div class="flex gap-6 text-xs pt-1">
+                            <label class="flex items-center gap-2 cursor-pointer text-slate-700 hover:text-indigo-600">
+                                <input type="checkbox" id="s-gte-0" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                s ≧ 0
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer text-slate-700 hover:text-indigo-600">
+                                <input type="checkbox" id="t-gte-0" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                t ≧ 0
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Inequality Constraint 1: ds + et <= f -->
+                    <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-bold text-slate-800 flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="ineq1-enable" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                不等式上限①: ds + et ≦ f
+                            </label>
+                            <span class="text-[11px] bg-white px-2 py-0.5 rounded border border-slate-200 font-mono font-bold text-indigo-600" id="ineq1-preview">s + t ≦ 1</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-xs pt-1">
+                            <div class="bg-white p-2 rounded-xl border border-slate-200">
+                                <span class="text-slate-500 text-[10px] block">d = <span id="d-val" class="text-slate-800 font-bold">1</span></span>
+                                <input type="range" id="param-d" min="-4" max="4" step="0.5" value="1" class="w-full accent-indigo-600 mt-1">
+                            </div>
+                            <div class="bg-white p-2 rounded-xl border border-slate-200">
+                                <span class="text-slate-500 text-[10px] block">e = <span id="e-val" class="text-slate-800 font-bold">1</span></span>
+                                <input type="range" id="param-e" min="-4" max="4" step="0.5" value="1" class="w-full accent-indigo-600 mt-1">
+                            </div>
+                            <div class="bg-white p-2 rounded-xl border border-slate-200">
+                                <span class="text-slate-500 text-[10px] block">f = <span id="f-val" class="text-slate-800 font-bold">1</span></span>
+                                <input type="range" id="param-f" min="-4" max="4" step="0.5" value="1" class="w-full accent-indigo-600 mt-1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Inequality Constraint 2: gs + ht >= i -->
+                    <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-bold text-slate-800 flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="ineq2-enable" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                不等式下限②: gs + ht ≧ i
+                            </label>
+                            <span class="text-[11px] bg-white px-2 py-0.5 rounded border border-slate-200 font-mono font-bold text-indigo-600" id="ineq2-preview">s + t ≧ 0</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-xs pt-1">
+                            <div class="bg-white p-2 rounded-xl border border-slate-200">
+                                <span class="text-slate-500 text-[10px] block">g = <span id="g-val" class="text-slate-800 font-bold">1</span></span>
+                                <input type="range" id="param-g" min="-4" max="4" step="0.5" value="1" class="w-full accent-indigo-600 mt-1">
+                            </div>
+                            <div class="bg-white p-2 rounded-xl border border-slate-200">
+                                <span class="text-slate-500 text-[10px] block">h = <span id="h-val" class="text-slate-800 font-bold">1</span></span>
+                                <input type="range" id="param-h" min="-4" max="4" step="0.5" value="1" class="w-full accent-indigo-600 mt-1">
+                            </div>
+                            <div class="bg-white p-2 rounded-xl border border-slate-200">
+                                <span class="text-slate-500 text-[10px] block">i = <span id="i-val" class="text-slate-800 font-bold">0</span></span>
+                                <input type="range" id="param-i" min="-4" max="4" step="0.5" value="0" class="w-full accent-indigo-600 mt-1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Point P Testers in Custom Panel -->
+                    <div class="bg-indigo-50/70 p-3.5 rounded-2xl border border-indigo-100 space-y-2">
+                        <div class="text-xs font-bold text-indigo-900 flex justify-between items-center">
+                            <span>点Pの位置パラメータ (s, t)</span>
+                            <span class="text-[11px] font-mono text-indigo-600 font-bold" id="st-sum-disp">s+t = 1.00</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 text-xs pt-1">
+                            <div>
+                                <div class="flex justify-between text-[11px] text-slate-600 mb-1">
+                                    <span>s:</span> <span id="s-val-disp" class="font-mono font-bold">0.50</span>
+                                </div>
+                                <input type="range" id="point-s" min="-2" max="3" step="0.05" value="0.5" class="w-full accent-indigo-600">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-[11px] text-slate-600 mb-1">
+                                    <span>t:</span> <span id="t-val-disp" class="font-mono font-bold">0.50</span>
+                                </div>
+                                <input type="range" id="point-t" min="-2" max="3" step="0.05" value="0.5" class="w-full accent-indigo-600">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 2. Preset Tab -->
+                <div id="panel-preset" class="space-y-3 hidden">
+                    <h2 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">高校数学で頻出の領域パターン</h2>
+                    
+                    <div class="space-y-2">
+                        <button class="preset-btn w-full text-left p-3 rounded-2xl border border-slate-200 bg-slate-50 hover:border-indigo-500 hover:bg-indigo-50/50 transition relative group shadow-sm" data-preset="line">
+                            <div class="font-semibold text-slate-800 text-sm group-hover:text-indigo-600">1. 直線 AB</div>
+                            <div class="text-xs text-indigo-600 font-mono mt-0.5">s + t = 1</div>
+                            <p class="text-[11px] text-slate-500 mt-1">点Pは2点 A, B を通る無限直線上に存在。</p>
+                        </button>
+
+                        <button class="preset-btn w-full text-left p-3 rounded-2xl border border-slate-200 bg-slate-50 hover:border-indigo-500 hover:bg-indigo-50/50 transition relative group shadow-sm" data-preset="segment">
+                            <div class="font-semibold text-slate-800 text-sm group-hover:text-indigo-600">2. 線分 AB</div>
+                            <div class="text-xs text-indigo-600 font-mono mt-0.5">s + t = 1, s ≧ 0, t ≧ 0</div>
+                            <p class="text-[11px] text-slate-500 mt-1">点Pは内分点となる線分 AB 上に限定。</p>
+                        </button>
+
+                        <button class="preset-btn w-full text-left p-3 rounded-2xl border border-slate-200 bg-slate-50 hover:border-indigo-500 hover:bg-indigo-50/50 transition relative group shadow-sm" data-preset="triangle">
+                            <div class="font-semibold text-slate-800 text-sm group-hover:text-indigo-600">3. △OAB の内部および周</div>
+                            <div class="text-xs text-indigo-600 font-mono mt-0.5">s + t ≦ 1, s ≧ 0, t ≧ 0</div>
+                            <p class="text-[11px] text-slate-500 mt-1">三角形の領域内部（斜交座標における単位三角形）。</p>
+                        </button>
+
+                        <button class="preset-btn w-full text-left p-3 rounded-2xl border border-slate-200 bg-slate-50 hover:border-indigo-500 hover:bg-indigo-50/50 transition relative group shadow-sm" data-preset="parallelogram">
+                            <div class="font-semibold text-slate-800 text-sm group-hover:text-indigo-600">4. 平行四辺形の内部および周</div>
+                            <div class="text-xs text-indigo-600 font-mono mt-0.5">0 ≦ s ≦ 1, 0 ≦ t ≦ 1</div>
+                            <p class="text-[11px] text-slate-500 mt-1"><span class="v">OA</span>, <span class="v">OB</span> を隣り合う2辺とする平行四辺形。</p>
+                        </button>
+
+                        <button class="preset-btn w-full text-left p-3 rounded-2xl border border-slate-200 bg-slate-50 hover:border-indigo-500 hover:bg-indigo-50/50 transition relative group shadow-sm" data-preset="trapezoid">
+                            <div class="font-semibold text-slate-800 text-sm group-hover:text-indigo-600">5. 台形領域</div>
+                            <div class="text-xs text-indigo-600 font-mono mt-0.5">1 ≦ s + t ≦ 2, s ≧ 0, t ≧ 0</div>
+                            <p class="text-[11px] text-slate-500 mt-1">線分 AB とそれを2倍に拡大した線分で挟まれた台形。</p>
+                        </button>
+
+                        <button class="preset-btn w-full text-left p-3 rounded-2xl border border-slate-200 bg-slate-50 hover:border-indigo-500 hover:bg-indigo-50/50 transition relative group shadow-sm" data-preset="scaled-triangle">
+                            <div class="font-semibold text-slate-800 text-sm group-hover:text-indigo-600">6. 係数調整三角形</div>
+                            <div class="text-xs text-indigo-600 font-mono mt-0.5">s + 2t ≦ 2, s ≧ 0, t ≧ 0</div>
+                            <p class="text-[11px] text-slate-500 mt-1">(s/2) + t ≦ 1 と変形して考える典型問題。</p>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3. Exercise Tab (Random Generator) -->
+                <div id="panel-exercise" class="space-y-4 hidden">
+                    <div class="bg-amber-50 p-3.5 rounded-2xl border border-amber-200 text-xs space-y-2">
+                        <div class="font-bold flex items-center justify-between text-amber-900">
+                            <span class="flex items-center gap-1.5 text-sm">
+                                <i class="fa-solid fa-dice text-amber-600"></i> ランダム演習モード
+                            </span>
+                            <button id="gen-random-ex-btn" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded-lg font-medium text-xs shadow transition active:scale-95 flex items-center gap-1">
+                                <i class="fa-solid fa-rotate"></i> 新しい問題を生成
+                            </button>
+                        </div>
+                        <p class="text-[11px] text-amber-800">問題の条件を考えながら、点P（緑色）を動かして正解領域を探してみましょう！</p>
+                    </div>
+
+                    <!-- Question Card Container -->
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                        <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                            <span id="ex-type-badge" class="text-xs font-bold bg-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-md">
+                                問題
+                            </span>
+                            <button id="ex-hint-toggle" class="text-xs text-indigo-600 hover:underline flex items-center gap-1">
+                                <i class="fa-regular fa-lightbulb"></i> ヒントを表示
+                            </button>
+                        </div>
+
+                        <!-- Problem Description -->
+                        <div class="space-y-1">
+                            <div class="text-xs text-slate-500">【条件】 <span class="v">OP</span> = s<span class="v">OA</span> + t<span class="v">OB</span> において、</div>
+                            <div id="ex-formula-text" class="text-sm font-bold text-slate-900 bg-slate-50 p-2.5 rounded-xl border border-slate-200 font-mono text-center">
+                                s + t = 1 (s ≧ 0, t ≧ 0)
+                            </div>
+                        </div>
+
+                        <!-- Hint Box -->
+                        <div id="ex-hint-box" class="hidden text-xs bg-amber-50/90 text-amber-950 p-3 rounded-xl border border-amber-200 space-y-1 leading-relaxed">
+                            <div class="font-bold text-amber-800 flex items-center gap-1"><i class="fa-solid fa-lightbulb"></i> 解法のヒント:</div>
+                            <div id="ex-hint-content">両辺を定数で割って (s/a) + (t/b) = 1 または ≦ 1 の形を作りましょう。</div>
+                        </div>
+
+                        <!-- Check / Reveal Answer Controls -->
+                        <div class="pt-2 border-t border-slate-100 space-y-2">
+                            <button id="ex-show-ans-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-2 rounded-xl font-bold transition shadow-md flex justify-center items-center gap-1.5">
+                                <i class="fa-solid fa-eye"></i> 正解の領域をシミュレータに反映
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer Info -->
+            <div class="p-3 border-t border-slate-200 bg-slate-50 text-center text-[11px] text-slate-400">
+                Vector Geometry Interactive Simulator &copy; 2026
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        // State Management
+        const state = {
+            O: { x: 0, y: 0 },
+            A: { x: 1, y: 0 }, // Initial Unit Vector A
+            B: { x: 0, y: 1 }, // Initial Unit Vector B
+            s: 0.5,
+            t: 0.5,
+
+            zoom: 80, // pixels per coordinate unit
+            pan: { x: 0, y: 0 },
+
+            showGrid: true,
+            showSamples: true,
+
+            // Active Constraints
+            eq: { enabled: false, a: 1, b: 1, c: 1 },
+            sGte0: true,
+            tGte0: true,
+            ineq1: { enabled: true, d: 1, e: 1, f: 1 },
+            ineq2: { enabled: false, g: 1, h: 1, i: 0 },
+
+            draggingPoint: null,
+            dragStart: { x: 0, y: 0 },
+            pixelRatio: window.devicePixelRatio || 1,
+
+            currentExercise: null
+        };
+
+        const canvas = document.getElementById('sim-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Tabs & Panels
+        const tabCustom = document.getElementById('tab-custom');
+        const tabPreset = document.getElementById('tab-preset');
+        const tabExercise = document.getElementById('tab-exercise');
+        const panelCustom = document.getElementById('panel-custom');
+        const panelPreset = document.getElementById('panel-preset');
+        const panelExercise = document.getElementById('panel-exercise');
+
+        // UI Displays
+        const valA = document.getElementById('vector-a-val');
+        const valB = document.getElementById('vector-b-val');
+        const valP = document.getElementById('vector-p-val');
+        const sliderS = document.getElementById('point-s');
+        const sliderT = document.getElementById('point-t');
+        const dispS = document.getElementById('s-val-disp');
+        const dispT = document.getElementById('t-val-disp');
+        const dispSumST = document.getElementById('st-sum-disp');
+        const explanationText = document.getElementById('explanation-text');
+        const pStatusBadge = document.getElementById('p-status-badge');
+
+        // Check if given s, t satisfies active constraints
+        function checkConstraints(s, t) {
+            const TOLERANCE = 1e-4;
+
+            if (state.sGte0 && s < -TOLERANCE) return false;
+            if (state.tGte0 && t < -TOLERANCE) return false;
+
+            if (state.eq.enabled) {
+                const val = state.eq.a * s + state.eq.b * t;
+                if (Math.abs(val - state.eq.c) > 0.05) return false;
+            }
+
+            if (state.ineq1.enabled) {
+                const val = state.ineq1.d * s + state.ineq1.e * t;
+                if (val > state.ineq1.f + TOLERANCE) return false;
+            }
+
+            if (state.ineq2.enabled) {
+                const val = state.ineq2.g * s + state.ineq2.h * t;
+                if (val < state.ineq2.i - TOLERANCE) return false;
+            }
+
+            return true;
+        }
+
+        // Resizing Canvas with High-DPI Crisp Scaling
+        function resizeCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            state.pixelRatio = dpr;
+
+            const displayWidth = canvas.parentElement.clientWidth;
+            const displayHeight = canvas.parentElement.clientHeight;
+
+            canvas.width = displayWidth * dpr;
+            canvas.height = displayHeight * dpr;
+            canvas.style.width = displayWidth + 'px';
+            canvas.style.height = displayHeight + 'px';
+
+            draw();
+        }
+
+        function worldToScreen(wx, wy) {
+            const dpr = state.pixelRatio;
+            const cx = (canvas.width / dpr) / 2 + state.pan.x;
+            const cy = (canvas.height / dpr) / 2 + state.pan.y;
+            return {
+                x: cx + wx * state.zoom,
+                y: cy - wy * state.zoom
+            };
+        }
+
+        function screenToWorld(sx, sy) {
+            const dpr = state.pixelRatio;
+            const cx = (canvas.width / dpr) / 2 + state.pan.x;
+            const cy = (canvas.height / dpr) / 2 + state.pan.y;
+            return {
+                x: (sx - cx) / state.zoom,
+                y: (cy - sy) / state.zoom
+            };
+        }
+
+        function getPWorld() {
+            return computeP(state.s, state.t);
+        }
+
+        function computeP(s, t) {
+            return {
+                x: state.O.x + s * (state.A.x - state.O.x) + t * (state.B.x - state.O.x),
+                y: state.O.y + s * (state.A.y - state.O.y) + t * (state.B.y - state.O.y)
+            };
+        }
+
+        // Main Canvas Render
+        function draw() {
+            const dpr = state.pixelRatio;
+            ctx.save();
+            ctx.scale(dpr, dpr);
+
+            const displayWidth = canvas.width / dpr;
+            const displayHeight = canvas.height / dpr;
+
+            // Pure White Clean Background
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, displayWidth, displayHeight);
+
+            // 1. Grid & Axes
+            if (state.showGrid) {
+                drawGrid(displayWidth, displayHeight);
+            }
+
+            // 2. Feasible Solution Region Shading
+            drawFeasibleRegion();
+
+            // 3. Vectors & Decomposition Parallelogram
+            drawVectors();
+
+            // 4. Interactive Handle Points
+            drawPoints();
+
+            ctx.restore();
+        }
+
+        function drawGrid(width, height) {
+            const startWorld = screenToWorld(0, height);
+            const endWorld = screenToWorld(width, 0);
+
+            const step = 1;
+            const minX = Math.floor(startWorld.x);
+            const maxX = Math.ceil(endWorld.x);
+            const minY = Math.floor(startWorld.y);
+            const maxY = Math.ceil(endWorld.y);
+
+            // Fine Grid Lines
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+
+            for (let x = minX; x <= maxX; x += step) {
+                const p1 = worldToScreen(x, minY);
+                const p2 = worldToScreen(x, maxY);
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+            }
+
+            for (let y = minY; y <= maxY; y += step) {
+                const p1 = worldToScreen(minX, y);
+                const p2 = worldToScreen(maxX, y);
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+            }
+
+            // Origin position
+            const origin = worldToScreen(0, 0);
+
+            // Main Axes Lines
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2;
+
+            // X Axis
+            ctx.beginPath();
+            ctx.moveTo(0, origin.y);
+            ctx.lineTo(width, origin.y);
+            ctx.stroke();
+
+            // Y Axis
+            ctx.beginPath();
+            ctx.moveTo(origin.x, 0);
+            ctx.lineTo(origin.x, height);
+            ctx.stroke();
+
+            // Axes Arrow Heads
+            drawArrowHead({ x: width - 14, y: origin.y }, { x: width, y: origin.y }, '#334155', 12);
+            drawArrowHead({ x: origin.x, y: 14 }, { x: origin.x, y: 0 }, '#334155', 12);
+
+            // Axis Text Labels
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 12px Inter';
+            ctx.fillText('x', width - 18, origin.y - 10);
+            ctx.fillText('y', origin.x + 10, 18);
+
+            // Ticks and Numbers
+            ctx.font = '10px Inter';
+            ctx.fillStyle = '#64748b';
+
+            for (let x = minX; x <= maxX; x++) {
+                if (x === 0) continue;
+                const p = worldToScreen(x, 0);
+                if (p.x > 0 && p.x < width) {
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, origin.y - 3);
+                    ctx.lineTo(p.x, origin.y + 3);
+                    ctx.stroke();
+                    ctx.fillText(x.toString(), p.x - 4, origin.y + 16);
+                }
+            }
+
+            for (let y = minY; y <= maxY; y++) {
+                if (y === 0) continue;
+                const p = worldToScreen(0, y);
+                if (p.y > 0 && p.y < height) {
+                    ctx.beginPath();
+                    ctx.moveTo(origin.x - 3, p.y);
+                    ctx.lineTo(origin.x + 3, p.y);
+                    ctx.stroke();
+                    ctx.fillText(y.toString(), origin.x - 18, p.y + 4);
+                }
+            }
+        }
+
+        function drawFeasibleRegion() {
+            const sMin = -3, sMax = 4;
+            const tMin = -3, tMax = 4;
+            const resolution = state.eq.enabled ? 0.02 : 0.05;
+
+            if (state.eq.enabled) {
+                // Equality Constraint Line
+                ctx.strokeStyle = '#4f46e5';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+
+                let started = false;
+                for (let s = sMin; s <= sMax; s += 0.01) {
+                    if (Math.abs(state.eq.b) > 1e-4) {
+                        const t = (state.eq.c - state.eq.a * s) / state.eq.b;
+                        if (checkConstraints(s, t)) {
+                            const P = computeP(s, t);
+                            const scr = worldToScreen(P.x, P.y);
+                            if (!started) {
+                                ctx.moveTo(scr.x, scr.y);
+                                started = true;
+                            } else {
+                                ctx.lineTo(scr.x, scr.y);
+                            }
+                        } else {
+                            started = false;
+                        }
+                    }
+                }
+                ctx.stroke();
+            } else {
+                // Shaded Area Cloud for Inequalities
+                if (state.showSamples) {
+                    for (let s = sMin; s <= sMax; s += resolution) {
+                        for (let t = tMin; t <= tMax; t += resolution) {
+                            if (checkConstraints(s, t)) {
+                                const P = computeP(s, t);
+                                const scr = worldToScreen(P.x, P.y);
+                                ctx.fillStyle = 'rgba(99, 102, 241, 0.4)';
+                                ctx.beginPath();
+                                ctx.arc(scr.x, scr.y, 2.8, 0, Math.PI * 2);
+                                ctx.fill();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function drawVectors() {
+            const ScrO = worldToScreen(state.O.x, state.O.y);
+            const ScrA = worldToScreen(state.A.x, state.A.y);
+            const ScrB = worldToScreen(state.B.x, state.B.y);
+
+            const P = getPWorld();
+            const ScrP = worldToScreen(P.x, P.y);
+
+            const sA_world = {
+                x: state.O.x + state.s * (state.A.x - state.O.x),
+                y: state.O.y + state.s * (state.A.y - state.O.y)
+            };
+            const tB_world = {
+                x: state.O.x + state.t * (state.B.x - state.O.x),
+                y: state.O.y + state.t * (state.B.y - state.O.y)
+            };
+
+            const ScrSA = worldToScreen(sA_world.x, sA_world.y);
+            const ScrTB = worldToScreen(tB_world.x, tB_world.y);
+
+            // Component Decomposition Dashed Lines
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1.5;
+
+            ctx.beginPath();
+            ctx.moveTo(ScrSA.x, ScrSA.y);
+            ctx.lineTo(ScrP.x, ScrP.y);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(ScrTB.x, ScrTB.y);
+            ctx.lineTo(ScrP.x, ScrP.y);
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+
+            // Vector OA
+            drawVectorWithArrow(ScrO, ScrA, '#f43f5e', 3, 'OA');
+            
+            // Vector OB
+            drawVectorWithArrow(ScrO, ScrB, '#0284c7', 3, 'OB');
+
+            // Resultant Vector OP
+            const isValid = checkConstraints(state.s, state.t);
+            const pColor = isValid ? '#10b981' : '#f59e0b';
+            drawVectorWithArrow(ScrO, ScrP, pColor, 4, 'OP');
+        }
+
+        function drawVectorWithArrow(from, to, color, width, labelText) {
+            const headlen = 12;
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist < 2) return;
+
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = width;
+
+            // Main Line
+            ctx.beginPath();
+            ctx.moveTo(from.x, from.y);
+            ctx.lineTo(to.x, to.y);
+            ctx.stroke();
+
+            // Tip Arrow
+            drawArrowHead(from, to, color, headlen);
+
+            // Crisp Vector Label with Overline Arrow
+            if (labelText) {
+                const midX = (from.x + to.x) / 2;
+                const midY = (from.y + to.y) / 2;
+
+                ctx.save();
+                ctx.font = 'bold 13px Inter';
+                
+                const textWidth = ctx.measureText(labelText).width;
+                
+                // Label Background Pill
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+                ctx.shadowColor = 'rgba(0,0,0,0.1)';
+                ctx.shadowBlur = 4;
+                ctx.beginPath();
+                ctx.roundRect(midX - textWidth / 2 - 7, midY - 20, textWidth + 14, 22, 6);
+                ctx.fill();
+
+                ctx.shadowBlur = 0;
+
+                // Base Character Text
+                ctx.fillStyle = color;
+                ctx.fillText(labelText, midX - textWidth / 2, midY - 5);
+                
+                // Overline Arrow Line
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(midX - textWidth / 2, midY - 18);
+                ctx.lineTo(midX + textWidth / 2, midY - 18);
+                ctx.stroke();
+
+                // Small Arrow Head on Overline
+                ctx.beginPath();
+                ctx.moveTo(midX + textWidth / 2 - 3, midY - 20);
+                ctx.lineTo(midX + textWidth / 2, midY - 18);
+                ctx.lineTo(midX + textWidth / 2 - 3, midY - 16);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        function drawArrowHead(from, to, color, headlen) {
+            const angle = Math.atan2(to.y - from.y, to.x - from.x);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(to.x, to.y);
+            ctx.lineTo(to.x - headlen * Math.cos(angle - Math.PI / 6), to.y - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(to.x - headlen * Math.cos(angle + Math.PI / 6), to.y - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawPoints() {
+            const pts = [
+                { name: 'O', pos: state.O, bg: '#334155' },
+                { name: 'A', pos: state.A, bg: '#f43f5e' },
+                { name: 'B', pos: state.B, bg: '#0284c7' },
+                { name: 'P', pos: getPWorld(), bg: checkConstraints(state.s, state.t) ? '#10b981' : '#f59e0b' }
+            ];
+
+            pts.forEach(pt => {
+                const scr = worldToScreen(pt.pos.x, pt.pos.y);
+
+                ctx.fillStyle = pt.bg;
+                ctx.beginPath();
+                ctx.arc(scr.x, scr.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                ctx.fillStyle = '#0f172a';
+                ctx.font = 'bold 13px Inter';
+                ctx.fillText(pt.name, scr.x + 12, scr.y + 4);
+            });
+        }
+
+        function updateUI() {
+            valA.textContent = `${(state.A.x - state.O.x).toFixed(2)}, ${(state.A.y - state.O.y).toFixed(2)}`;
+            valB.textContent = `${(state.B.x - state.O.x).toFixed(2)}, ${(state.B.y - state.O.y).toFixed(2)}`;
+            
+            const P = getPWorld();
+            valP.textContent = `${P.x.toFixed(2)}, ${P.y.toFixed(2)}`;
+
+            dispS.textContent = state.s.toFixed(2);
+            dispT.textContent = state.t.toFixed(2);
+            dispSumST.textContent = `s+t = ${(state.s + state.t).toFixed(2)}`;
+
+            document.getElementById('eq-preview').textContent = `${state.eq.a}s + ${state.eq.b}t = ${state.eq.c}`;
+            document.getElementById('ineq1-preview').textContent = `${state.ineq1.d}s + ${state.ineq1.e}t ≦ ${state.ineq1.f}`;
+            document.getElementById('ineq2-preview').textContent = `${state.ineq2.g}s + ${state.ineq2.h}t ≧ ${state.ineq2.i}`;
+
+            const isInside = checkConstraints(state.s, state.t);
+            if (isInside) {
+                pStatusBadge.className = "px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5";
+                pStatusBadge.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> 点Pは条件を満たしています (領域内)`;
+            } else {
+                pStatusBadge.className = "px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5";
+                pStatusBadge.innerHTML = `<i class="fa-solid fa-circle-exclamation text-amber-400"></i> 点Pは条件の範囲外です`;
+            }
+
+            updateExplanation();
+        }
+
+        function updateExplanation() {
+            let msg = "";
+            if (state.eq.enabled) {
+                if (state.eq.a === 1 && state.eq.b === 1 && state.eq.c === 1) {
+                    msg = state.sGte0 && state.tGte0 ? "s + t = 1, s ≧ 0, t ≧ 0 より、点Pは「線分 AB 上」に存在します。" : "s + t = 1 より、点Pは「直線 AB 上」に存在します。";
+                } else {
+                    msg = `等式 ${state.eq.a}s + ${state.eq.b}t = ${state.eq.c} を満たす直線上の範囲です。`;
+                }
+            } else if (state.ineq1.enabled && state.ineq1.d === 1 && state.ineq1.e === 1 && state.ineq1.f === 1 && state.sGte0 && state.tGte0) {
+                msg = "s + t ≦ 1, s ≧ 0, t ≧ 0 より、点Pは「△OAB の内部および周上」に存在します。";
+            } else {
+                msg = "設定された一次不等式・等式条件を満たす斜交領域が表示されています。";
+            }
+            explanationText.textContent = msg;
+        }
+
+        // Random Exercise Problem Generator
+        function generateRandomExercise() {
+            const types = ['segment', 'line', 'triangle', 'parallelogram', 'trapezoid', 'scaled-triangle'];
+            const selectedType = types[Math.floor(Math.random() * types.length)];
+
+            let ex = { type: selectedType, formula: '', hint: '', config: {} };
+
+            const r1 = Math.floor(Math.random() * 3) + 1; // 1, 2, or 3
+            const r2 = Math.floor(Math.random() * 3) + 1;
+            const rSum = r1 + r2;
+
+            switch(selectedType) {
+                case 'segment':
+                    ex.formula = `${r1 === 1 ? '' : r1}s + ${r2 === 1 ? '' : r2}t = ${rSum} (s ≧ 0, t ≧ 0)`;
+                    ex.hint = `両辺を ${rSum} で割ると、(${r1 === 1 ? '' : r1}s/${rSum}) + (${r2 === 1 ? '' : r2}t/${rSum}) = 1 となります。内分点を結ぶ線分を考えましょう！`;
+                    ex.config = { eq: { enabled: true, a: r1, b: r2, c: rSum }, sGte0: true, tGte0: true };
+                    break;
+                case 'line':
+                    ex.formula = `${r1 === 1 ? '' : r1}s + ${r2 === 1 ? '' : r2}t = ${rSum}`;
+                    ex.hint = `s ≧ 0, t ≧ 0 の制限がないため、内分点にとどまらず両側に伸びる直線全体になります。`;
+                    ex.config = { eq: { enabled: true, a: r1, b: r2, c: rSum }, sGte0: false, tGte0: false };
+                    break;
+                case 'triangle':
+                    ex.formula = `${r1 === 1 ? '' : r1}s + ${r2 === 1 ? '' : r2}t ≦ ${rSum} (s ≧ 0, t ≧ 0)`;
+                    ex.hint = `両辺を ${rSum} で割ると (s/${rSum/r1}) + (t/${rSum/r2}) ≦ 1 です。各軸上の到達点を頂点とする三角形領域です。`;
+                    ex.config = { ineq1: { enabled: true, d: r1, e: r2, f: rSum }, sGte0: true, tGte0: true };
+                    break;
+                case 'parallelogram':
+                    ex.formula = `0 ≦ s ≦ ${r1}, 0 ≦ t ≦ ${r2}`;
+                    ex.hint = `s の範囲と t の範囲が独立しているため、2辺をそれぞれ ${r1}倍, ${r2}倍に伸ばした平行四辺形になります。`;
+                    ex.config = { ineq1: { enabled: true, d: 1, e: 0, f: r1 }, ineq2: { enabled: true, g: 0, h: 1, i: 0 }, sGte0: true, tGte0: true };
+                    break;
+                case 'trapezoid':
+                    ex.formula = `1 ≦ s + t ≦ ${r1 + 1} (s ≧ 0, t ≧ 0)`;
+                    ex.hint = `s + t ≧ 1 (線分ABの外側) かつ s + t ≦ ${r1 + 1} の間にある台形領域です。`;
+                    ex.config = { ineq1: { enabled: true, d: 1, e: 1, f: r1 + 1 }, ineq2: { enabled: true, g: 1, h: 1, i: 1 }, sGte0: true, tGte0: true };
+                    break;
+                case 'scaled-triangle':
+                    ex.formula = `s + ${r2 + 1}t ≦ ${r2 + 1} (s ≧ 0, t ≧ 0)`;
+                    ex.hint = `s/${r2 + 1} + t ≦ 1 と変形すると、A方向のベクトルを ${r2 + 1}倍した位置が端点になります。`;
+                    ex.config = { ineq1: { enabled: true, d: 1, e: r2 + 1, f: r2 + 1 }, sGte0: true, tGte0: true };
+                    break;
+            }
+
+            state.currentExercise = ex;
+
+            // Update UI elements
+            document.getElementById('ex-formula-text').textContent = ex.formula;
+            document.getElementById('ex-hint-content').textContent = ex.hint;
+            document.getElementById('ex-hint-box').classList.add('hidden');
+        }
+
+        function applyExerciseConfig(config) {
+            state.eq.enabled = false;
+            state.ineq1.enabled = false;
+            state.ineq2.enabled = false;
+            state.sGte0 = false;
+            state.tGte0 = false;
+
+            if (config.eq) state.eq = { ...state.eq, ...config.eq };
+            if (config.ineq1) state.ineq1 = { ...state.ineq1, ...config.ineq1 };
+            if (config.ineq2) state.ineq2 = { ...state.ineq2, ...config.ineq2 };
+            if (config.sGte0 !== undefined) state.sGte0 = config.sGte0;
+            if (config.tGte0 !== undefined) state.tGte0 = config.tGte0;
+
+            document.getElementById('eq-enable').checked = state.eq.enabled;
+            document.getElementById('ineq1-enable').checked = state.ineq1.enabled;
+            document.getElementById('ineq2-enable').checked = state.ineq2.enabled;
+            document.getElementById('s-gte-0').checked = state.sGte0;
+            document.getElementById('t-gte-0').checked = state.tGte0;
+
+            syncControlInputs();
+            updateUI();
+            draw();
+        }
+
+        function setupEventListeners() {
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            // Tabs switching
+            tabCustom.addEventListener('click', () => switchTab('custom'));
+            tabPreset.addEventListener('click', () => switchTab('preset'));
+            tabExercise.addEventListener('click', () => switchTab('exercise'));
+
+            function switchTab(tab) {
+                [tabCustom, tabPreset, tabExercise].forEach(t => {
+                    t.classList.remove('border-indigo-600', 'text-indigo-600', 'bg-white');
+                    t.classList.add('border-transparent', 'text-slate-500');
+                });
+                [panelCustom, panelPreset, panelExercise].forEach(p => p.classList.add('hidden'));
+
+                if (tab === 'custom') {
+                    tabCustom.classList.add('border-indigo-600', 'text-indigo-600', 'bg-white');
+                    panelCustom.classList.remove('hidden');
+                } else if (tab === 'preset') {
+                    tabPreset.classList.add('border-indigo-600', 'text-indigo-600', 'bg-white');
+                    panelPreset.classList.remove('hidden');
+                } else {
+                    tabExercise.classList.add('border-indigo-600', 'text-indigo-600', 'bg-white');
+                    panelExercise.classList.remove('hidden');
+                    if (!state.currentExercise) {
+                        generateRandomExercise();
+                    }
+                }
+            }
+
+            // Presets buttons
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    applyPreset(btn.dataset.preset);
+                });
+            });
+
+            // Point P sliders
+            sliderS.addEventListener('input', (e) => {
+                state.s = parseFloat(e.target.value);
+                updateUI();
+                draw();
+            });
+            sliderT.addEventListener('input', (e) => {
+                state.t = parseFloat(e.target.value);
+                updateUI();
+                draw();
+            });
+
+            // Sliders binding
+            bindSlider('param-a', 'a-val', (v) => state.eq.a = v);
+            bindSlider('param-b', 'b-val', (v) => state.eq.b = v);
+            bindSlider('param-c', 'c-val', (v) => state.eq.c = v);
+
+            bindSlider('param-d', 'd-val', (v) => state.ineq1.d = v);
+            bindSlider('param-e', 'e-val', (v) => state.ineq1.e = v);
+            bindSlider('param-f', 'f-val', (v) => state.ineq1.f = v);
+
+            bindSlider('param-g', 'g-val', (v) => state.ineq2.g = v);
+            bindSlider('param-h', 'h-val', (v) => state.ineq2.h = v);
+            bindSlider('param-i', 'i-val', (v) => state.ineq2.i = v);
+
+            document.getElementById('eq-enable').addEventListener('change', (e) => { state.eq.enabled = e.target.checked; updateUI(); draw(); });
+            document.getElementById('ineq1-enable').addEventListener('change', (e) => { state.ineq1.enabled = e.target.checked; updateUI(); draw(); });
+            document.getElementById('ineq2-enable').addEventListener('change', (e) => { state.ineq2.enabled = e.target.checked; updateUI(); draw(); });
+            document.getElementById('s-gte-0').addEventListener('change', (e) => { state.sGte0 = e.target.checked; updateUI(); draw(); });
+            document.getElementById('t-gte-0').addEventListener('change', (e) => { state.tGte0 = e.target.checked; updateUI(); draw(); });
+
+            // Reset All Settings Button
+            document.getElementById('reset-all-btn').addEventListener('click', resetToDefault);
+
+            // View Controls
+            document.getElementById('reset-view-btn').addEventListener('click', () => {
+                state.pan = { x: 0, y: 0 };
+                state.zoom = 80;
+                draw();
+            });
+
+            document.getElementById('toggle-grid-btn').addEventListener('click', () => {
+                state.showGrid = !state.showGrid;
+                draw();
+            });
+
+            document.getElementById('zoom-in-btn').addEventListener('click', () => {
+                state.zoom = Math.min(250, state.zoom * 1.25);
+                draw();
+            });
+
+            document.getElementById('zoom-out-btn').addEventListener('click', () => {
+                state.zoom = Math.max(20, state.zoom / 1.25);
+                draw();
+            });
+
+            // Wheel Zooming
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+                state.zoom = Math.min(250, Math.max(20, state.zoom * zoomFactor));
+                draw();
+            }, { passive: false });
+
+            // Dragging Points & Panning
+            canvas.addEventListener('mousedown', handlePointerDown);
+            canvas.addEventListener('mousemove', handlePointerMove);
+            window.addEventListener('mouseup', handlePointerUp);
+
+            canvas.addEventListener('touchstart', (e) => handlePointerDown(e.touches[0]));
+            canvas.addEventListener('touchmove', (e) => handlePointerMove(e.touches[0]));
+            window.addEventListener('touchend', handlePointerUp);
+
+            // Exercise tab controls
+            document.getElementById('gen-random-ex-btn').addEventListener('click', generateRandomExercise);
+            document.getElementById('ex-hint-toggle').addEventListener('click', () => {
+                document.getElementById('ex-hint-box').classList.toggle('hidden');
+            });
+            document.getElementById('ex-show-ans-btn').addEventListener('click', () => {
+                if (state.currentExercise) {
+                    applyExerciseConfig(state.currentExercise.config);
+                }
+            });
+        }
+
+        function bindSlider(sliderId, valId, callback) {
+            const slider = document.getElementById(sliderId);
+            const disp = document.getElementById(valId);
+            slider.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                disp.textContent = val;
+                callback(val);
+                updateUI();
+                draw();
+            });
+        }
+
+        function handlePointerDown(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            const P = getPWorld();
+            const pts = [
+                { name: 'O', pos: state.O },
+                { name: 'A', pos: state.A },
+                { name: 'B', pos: state.B },
+                { name: 'P', pos: P }
+            ];
+
+            for (let pt of pts) {
+                const scr = worldToScreen(pt.pos.x, pt.pos.y);
+                const dist = Math.hypot(scr.x - clickX, scr.y - clickY);
+                if (dist < 18) {
+                    state.draggingPoint = pt.name;
+                    state.dragStart = { x: clickX, y: clickY };
+                    return;
+                }
+            }
+
+            state.draggingPoint = 'PAN';
+            state.dragStart = { x: clickX - state.pan.x, y: clickY - state.pan.y };
+        }
+
+        function handlePointerMove(e) {
+            if (!state.draggingPoint) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            if (state.draggingPoint === 'PAN') {
+                state.pan.x = mouseX - state.dragStart.x;
+                state.pan.y = mouseY - state.dragStart.y;
+            } else {
+                const world = screenToWorld(mouseX, mouseY);
+                const snappedX = Math.round(world.x * 2) / 2;
+                const snappedY = Math.round(world.y * 2) / 2;
+
+                if (state.draggingPoint === 'O') {
+                    state.O.x = snappedX; state.O.y = snappedY;
+                } else if (state.draggingPoint === 'A') {
+                    state.A.x = snappedX; state.A.y = snappedY;
+                } else if (state.draggingPoint === 'B') {
+                    state.B.x = snappedX; state.B.y = snappedY;
+                }
+            }
+
+            updateUI();
+            draw();
+        }
+
+        function handlePointerUp() {
+            state.draggingPoint = null;
+        }
+
+        function resetToDefault() {
+            state.O = { x: 0, y: 0 };
+            state.A = { x: 1, y: 0 };
+            state.B = { x: 0, y: 1 };
+            state.s = 0.5;
+            state.t = 0.5;
+            state.pan = { x: 0, y: 0 };
+            state.zoom = 80;
+
+            sliderS.value = 0.5;
+            sliderT.value = 0.5;
+
+            applyPreset('triangle');
+        }
+
+        function applyPreset(name) {
+            state.eq.enabled = false;
+            state.ineq1.enabled = false;
+            state.ineq2.enabled = false;
+            state.sGte0 = false;
+            state.tGte0 = false;
+
+            document.getElementById('eq-enable').checked = false;
+            document.getElementById('ineq1-enable').checked = false;
+            document.getElementById('ineq2-enable').checked = false;
+            document.getElementById('s-gte-0').checked = false;
+            document.getElementById('t-gte-0').checked = false;
+
+            switch (name) {
+                case 'line':
+                    state.eq = { enabled: true, a: 1, b: 1, c: 1 };
+                    document.getElementById('eq-enable').checked = true;
+                    break;
+                case 'segment':
+                    state.eq = { enabled: true, a: 1, b: 1, c: 1 };
+                    state.sGte0 = true;
+                    state.tGte0 = true;
+                    document.getElementById('eq-enable').checked = true;
+                    document.getElementById('s-gte-0').checked = true;
+                    document.getElementById('t-gte-0').checked = true;
+                    break;
+                case 'triangle':
+                    state.ineq1 = { enabled: true, d: 1, e: 1, f: 1 };
+                    state.sGte0 = true;
+                    state.tGte0 = true;
+                    document.getElementById('ineq1-enable').checked = true;
+                    document.getElementById('s-gte-0').checked = true;
+                    document.getElementById('t-gte-0').checked = true;
+                    break;
+                case 'parallelogram':
+                    state.ineq1 = { enabled: true, d: 1, e: 0, f: 1 };
+                    state.ineq2 = { enabled: true, g: 0, h: 1, i: 0 };
+                    state.sGte0 = true;
+                    state.tGte0 = true;
+                    document.getElementById('ineq1-enable').checked = true;
+                    document.getElementById('s-gte-0').checked = true;
+                    document.getElementById('t-gte-0').checked = true;
+                    break;
+                case 'trapezoid':
+                    state.ineq1 = { enabled: true, d: 1, e: 1, f: 2 };
+                    state.ineq2 = { enabled: true, g: 1, h: 1, i: 1 };
+                    state.sGte0 = true;
+                    state.tGte0 = true;
+                    document.getElementById('ineq1-enable').checked = true;
+                    document.getElementById('ineq2-enable').checked = true;
+                    document.getElementById('s-gte-0').checked = true;
+                    document.getElementById('t-gte-0').checked = true;
+                    break;
+                case 'scaled-triangle':
+                    state.ineq1 = { enabled: true, d: 1, e: 2, f: 2 };
+                    state.sGte0 = true;
+                    state.tGte0 = true;
+                    document.getElementById('ineq1-enable').checked = true;
+                    document.getElementById('s-gte-0').checked = true;
+                    document.getElementById('t-gte-0').checked = true;
+                    break;
+            }
+
+            syncControlInputs();
+            updateUI();
+            draw();
+        }
+
+        function syncControlInputs() {
+            document.getElementById('param-a').value = state.eq.a; document.getElementById('a-val').textContent = state.eq.a;
+            document.getElementById('param-b').value = state.eq.b; document.getElementById('b-val').textContent = state.eq.b;
+            document.getElementById('param-c').value = state.eq.c; document.getElementById('c-val').textContent = state.eq.c;
+
+            document.getElementById('param-d').value = state.ineq1.d; document.getElementById('d-val').textContent = state.ineq1.d;
+            document.getElementById('param-e').value = state.ineq1.e; document.getElementById('e-val').textContent = state.ineq1.e;
+            document.getElementById('param-f').value = state.ineq1.f; document.getElementById('f-val').textContent = state.ineq1.f;
+
+            document.getElementById('param-g').value = state.ineq2.g; document.getElementById('g-val').textContent = state.ineq2.g;
+            document.getElementById('param-h').value = state.ineq2.h; document.getElementById('h-val').textContent = state.ineq2.h;
+            document.getElementById('param-i').value = state.ineq2.i; document.getElementById('i-val').textContent = state.ineq2.i;
+        }
+
+        window.onload = function() {
+            setupEventListeners();
+            updateUI();
+            draw();
+        };
+    </script>
+</body>
+</html>
