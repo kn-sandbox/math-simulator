@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ベクトルと点Pの存在範囲シミュレータ</title>
+    <title>ベクトルと点Pの存在範囲について</title>
     <!-- Tailwind CSS for modern responsive UI -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -72,7 +72,7 @@
                         <span class="v">OP</span> = s<span class="v">OA</span> + t<span class="v">OB</span>
                     </span>
                 </h1>
-                <p class="text-[11px] text-indigo-200">係数 s, t の条件と点Pの存在領域インタラクティブ視覚化ツール</p>
+                <p class="text-[11px] text-indigo-200">係数 s, t の条件と点Pの存在領域を視覚化するシミュレーション</p>
             </div>
         </div>
 
@@ -145,13 +145,13 @@
             <!-- Tab Headers -->
             <div class="flex border-b border-slate-200 bg-slate-50/80 text-xs font-semibold">
                 <button id="tab-custom" class="flex-1 py-3 border-b-2 border-indigo-600 text-indigo-600 bg-white transition flex justify-center items-center gap-1.5">
-                    <i class="fa-solid fa-sliders"></i> 自由設定
+                    <i class="fa-solid fa-sliders"></i> 自由に設定
                 </button>
                 <button id="tab-preset" class="flex-1 py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition flex justify-center items-center gap-1.5">
                     <i class="fa-solid fa-bookmark"></i> 典型パターン
                 </button>
                 <button id="tab-exercise" class="flex-1 py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition flex justify-center items-center gap-1.5">
-                    <i class="fa-solid fa-dice text-amber-500"></i> 演習問題(ランダム)
+                    <i class="fa-solid fa-dice text-amber-500"></i> 演習問題
                 </button>
             </div>
 
@@ -192,7 +192,7 @@
 
                     <!-- Non-negativity Constraints -->
                     <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2 shadow-sm">
-                        <div class="text-xs font-bold text-slate-800">非負条件 (象限限定)</div>
+                        <div class="text-xs font-bold text-slate-800">非負条件</div>
                         <div class="flex gap-6 text-xs pt-1">
                             <label class="flex items-center gap-2 cursor-pointer text-slate-700 hover:text-indigo-600">
                                 <input type="checkbox" id="s-gte-0" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" checked>
