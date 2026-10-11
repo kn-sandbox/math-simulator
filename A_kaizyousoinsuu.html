@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>地層で見る素因数分解 (Discrete Strata Simulator)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #0b0f19;
+            color: #f1f5f9;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Custom Scrollbar for canvas & tabs */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        .btn-touch {
+            transition: transform 0.1s ease, background-color 0.15s ease, color 0.15s ease;
+        }
+        .btn-touch:active {
+            transform: scale(0.95);
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(51, 65, 85, 0.4);
+        }
+
+        /* Hide scrollbars for clean tab bar horizontal scrolling */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 select-none overflow-x-hidden">
+
+    <!-- Header with Live Counter -->
+    <header class="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur sticky top-0 z-50 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-700 flex items-center justify-center shadow-lg shadow-orange-950/40 border border-amber-400/30">
+                    <i class="fa-solid fa-layer-group text-amber-100 text-base"></i>
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-lg font-extrabold bg-gradient-to-r from-amber-200 via-orange-300 to-amber-500 bg-clip-text text-transparent">
+                        地層シミュレーター
+                    </h1>
+                </div>
+            </div>
+
+            <!-- Total Factor Count Display -->
+            <div class="bg-slate-950 border border-amber-500/40 px-3.5 py-1.5 rounded-xl flex items-center gap-2 shadow-inner">
+                <span class="text-xs text-slate-400 font-semibold"><span id="countNText" class="font-mono text-amber-300">500!</span> に含まれる素因数 <span id="countPText" class="font-mono text-amber-300">5</span>:</span>
+                <span id="totalCountBadge" class="text-xl font-extrabold font-mono text-amber-400">124</span>
+                <span class="text-xs text-slate-400 font-semibold">個</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-4 py-4 flex flex-col gap-4">
+
+        <!-- Control Bar -->
+        <section class="glass-panel rounded-2xl p-3.5 sm:p-4 shadow-xl space-y-3.5">
+            
+            <!-- Prime Tabs Selector -->
+            <div class="space-y-1.5">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <i class="fa-solid fa-square-poll-vertical text-amber-400"></i> 素数 (p)
+                </div>
+                <div id="primeTabs" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                    <!-- Dynamic Prime Tabs inserted by JS -->
+                </div>
+            </div>
+
+            <div class="h-px bg-slate-800/80 w-full"></div>
+
+            <!-- Factorial Slider & Input Controls -->
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div class="flex-1 flex items-center gap-3 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+                    <span class="text-xs font-bold text-slate-300 whitespace-nowrap">
+                        階乗 <span class="text-amber-400 font-mono text-sm ml-0.5">N !</span>
+                    </span>
+                    <input type="range" id="nSlider" min="1" max="1000" value="500" step="1" 
+                        class="flex-1 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                    <div class="flex items-center space-x-1">
+                        <span class="text-xs text-slate-400 font-mono">N=</span>
+                        <input type="number" id="nInput" value="500" min="1" max="1000"
+                            class="w-16 bg-slate-900 border border-amber-500/40 rounded-lg px-1.5 py-0.5 text-center font-mono font-bold text-amber-300 text-sm focus:outline-none focus:border-amber-400">
+                    </div>
+                </div>
+
+                <!-- Presets -->
+                <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                    <span class="text-[11px] text-slate-400 whitespace-nowrap hidden md:inline">プリセット:</span>
+                    <button onclick="setParams(500, 5)" class="px-2.5 py-1 bg-amber-950/80 hover:bg-amber-900 border border-amber-700/60 rounded-lg text-amber-200 text-xs font-semibold whitespace-nowrap btn-touch">500! (p=5)</button>
+                    <button onclick="setParams(100, 5)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 text-xs whitespace-nowrap btn-touch">100! (p=5)</button>
+                    <button onclick="setParams(200, 2)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 text-xs whitespace-nowrap btn-touch">200! (p=2)</button>
+                    <button onclick="setParams(300, 3)" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 text-xs whitespace-nowrap btn-touch">300! (p=3)</button>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Visualizer Area -->
+        <section class="glass-panel rounded-2xl p-3.5 sm:p-4 shadow-2xl flex-1 flex flex-col gap-3 min-h-[460px]">
+            
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-cubes-stacked text-amber-400 text-xs"></i>
+                    <h2 class="text-xs sm:text-sm font-bold text-slate-200">地層断面 (地表 1層目 → 深層 2層目...)</h2>
+                </div>
+
+                <!-- View Scale Mode -->
+                <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+                    <button id="viewFitBtn" onclick="setViewMode('fit')" class="px-2.5 py-1 rounded text-xs font-bold bg-amber-500 text-slate-950 transition">全体表示</button>
+                    <button id="viewZoomBtn" onclick="setViewMode('zoom')" class="px-2.5 py-1 rounded text-xs font-bold bg-slate-800 text-slate-300 hover:text-white transition">拡大 (スクロール)</button>
+                </div>
+            </div>
+
+            <!-- Canvas Viewport -->
+            <div id="canvasViewport" class="relative flex-1 w-full min-h-[380px] bg-slate-950 rounded-xl border border-slate-800/80 overflow-x-auto overflow-y-hidden shadow-inner custom-scrollbar">
+                
+                <canvas id="strataCanvas" class="h-full block cursor-crosshair"></canvas>
+
+                <!-- Tooltip -->
+                <div id="columnTooltip" class="absolute hidden pointer-events-none bg-slate-900/95 border border-amber-500/80 rounded-xl p-3 text-xs shadow-2xl z-30 max-w-xs transition-opacity duration-100">
+                    <div id="tooltipNumber" class="font-extrabold text-amber-300 border-b border-slate-800 pb-1 mb-1 text-sm font-mono">数値 : 250</div>
+                    <div id="tooltipFactorization" class="text-slate-200 font-mono text-[11px] mb-1">250 = 2 × 5³</div>
+                    <div id="tooltipValuation" class="text-amber-400 font-bold mb-1">素因数 5 を 3 個保持</div>
+                    <div id="tooltipBreakdown" class="text-[10px] text-slate-400 space-y-0.5 border-t border-slate-800/80 pt-1"></div>
+                </div>
+            </div>
+
+            <!-- Dynamic Layer Legend Cards -->
+            <div id="strataLegendGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                <!-- Dynamically populated -->
+            </div>
+
+        </section>
+
+    </main>
+
+    <script>
+        // Global State
+        let N = 500;
+        let P = 5;
+        let viewMode = 'fit';
+        let hoveredNumber = -1;
+
+        const primeList = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47];
+
+        // Stratum Colors (1st layer on top -> deeper layers down)
+        const strataGeology = [
+            { bg: "#1e293b", border: "#475569", text: "#94a3b8" }, // Ground base
+            { bg: "#b45309", border: "#f59e0b", text: "#fef08a" }, // Layer 1 (Surface layer)
+            { bg: "#ca8a04", border: "#facc15", text: "#fef9c3" }, // Layer 2
+            { bg: "#ea580c", border: "#fb923c", text: "#ffedd5" }, // Layer 3
+            { bg: "#dc2626", border: "#f87171", text: "#fee2e2" }, // Layer 4
+            { bg: "#9333ea", border: "#c084fc", text: "#f3e8ff" }, // Layer 5
+            { bg: "#4c1d95", border: "#a855f7", text: "#fae8ff" }  // Layer 6
+        ];
+
+        const canvas = document.getElementById('strataCanvas');
+        const ctx = canvas.getContext('2d');
+        const viewport = document.getElementById('canvasViewport');
+
+        window.addEventListener('DOMContentLoaded', () => {
+            renderPrimeTabs();
+            setupEventListeners();
+            updateAll();
+        });
+
+        function renderPrimeTabs() {
+            const container = document.getElementById('primeTabs');
+            container.innerHTML = '';
+
+            primeList.forEach(pVal => {
+                const btn = document.createElement('button');
+                btn.onclick = () => {
+                    P = pVal;
+                    renderPrimeTabs();
+                    updateAll();
+                };
+
+                const isSelected = (P === pVal);
+                btn.className = isSelected
+                    ? "px-3 py-1 bg-amber-500 text-slate-950 font-mono font-extrabold text-xs rounded-lg shadow-md border border-amber-300 whitespace-nowrap btn-touch"
+                    : "px-3 py-1 bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-mono font-bold text-xs rounded-lg border border-slate-700 whitespace-nowrap btn-touch";
+                
+                btn.innerText = `p = ${pVal}`;
+                container.appendChild(btn);
+            });
+        }
+
+        function setupEventListeners() {
+            const slider = document.getElementById('nSlider');
+            const nInput = document.getElementById('nInput');
+
+            slider.addEventListener('input', (e) => {
+                N = parseInt(e.target.value) || 1;
+                nInput.value = N;
+                updateAll();
+            });
+
+            nInput.addEventListener('change', (e) => {
+                let val = parseInt(e.target.value) || 1;
+                val = Math.max(1, Math.min(1000, val));
+                N = val;
+                slider.value = N;
+                updateAll();
+            });
+
+            canvas.addEventListener('mousemove', handlePointerMove);
+            canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+            canvas.addEventListener('mouseleave', clearPointer);
+            canvas.addEventListener('touchend', clearPointer);
+            
+            window.addEventListener('resize', () => {
+                drawDiscreteStrata();
+            });
+        }
+
+        function setParams(nVal, pVal) {
+            N = nVal;
+            P = pVal;
+            document.getElementById('nInput').value = N;
+            document.getElementById('nSlider').value = N;
+            renderPrimeTabs();
+            updateAll();
+        }
+
+        function setViewMode(mode) {
+            viewMode = mode;
+            const fitBtn = document.getElementById('viewFitBtn');
+            const zoomBtn = document.getElementById('viewZoomBtn');
+
+            if (mode === 'fit') {
+                fitBtn.className = "px-2.5 py-1 rounded text-xs font-bold bg-amber-500 text-slate-950 transition";
+                zoomBtn.className = "px-2.5 py-1 rounded text-xs font-bold bg-slate-800 text-slate-300 hover:text-white transition";
+            } else {
+                zoomBtn.className = "px-2.5 py-1 rounded text-xs font-bold bg-amber-500 text-slate-950 transition";
+                fitBtn.className = "px-2.5 py-1 rounded text-xs font-bold bg-slate-800 text-slate-300 hover:text-white transition";
+            }
+            updateAll();
+        }
+
+        function getValuation(k, p) {
+            let count = 0;
+            let temp = k;
+            while (temp > 0 && temp % p === 0) {
+                count++;
+                temp = Math.floor(temp / p);
+            }
+            return count;
+        }
+
+        function getLegendreStats() {
+            const layers = [];
+            let power = 1;
+            let pPower = Math.pow(P, power);
+
+            while (pPower <= N) {
+                const count = Math.floor(N / pPower);
+                layers.push({
+                    k: power,
+                    pPower: pPower,
+                    count: count
+                });
+                power++;
+                pPower = Math.pow(P, power);
+            }
+            return layers;
+        }
+
+        function updateAll() {
+            document.getElementById('countNText').innerText = `${N}!`;
+            document.getElementById('countPText').innerText = P;
+
+            const layers = getLegendreStats();
+            const total = layers.reduce((sum, l) => sum + l.count, 0);
+            document.getElementById('totalCountBadge').innerText = total;
+
+            renderLegendCards(layers);
+            drawDiscreteStrata();
+        }
+
+        function renderLegendCards(layers) {
+            const container = document.getElementById('strataLegendGrid');
+            container.innerHTML = '';
+
+            if (layers.length === 0) {
+                container.innerHTML = `<div class="col-span-full text-center text-xs text-slate-500 py-2">${P}<sup>1</sup> = ${P} > ${N} のため地層はありません</div>`;
+                return;
+            }
+
+            layers.forEach((l, idx) => {
+                const color = strataGeology[(idx + 1) % strataGeology.length];
+                const card = document.createElement('div');
+                card.className = "bg-slate-950 border border-slate-800/90 rounded-xl p-2 flex flex-col justify-between";
+
+                card.innerHTML = `
+                    <div class="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span class="font-bold flex items-center gap-1.5" style="color: ${color.text}">
+                            <span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:${color.bg}; border: 1px solid ${color.border}"></span>
+                            第 ${l.k} 層
+                        </span>
+                        <span class="font-mono text-[9px] bg-slate-900 px-1 py-0.2 rounded text-slate-300">${P}<sup>${l.k}</sup>=${l.pPower}</span>
+                    </div>
+                    <div class="text-sm font-mono font-extrabold text-slate-100 flex justify-between items-baseline">
+                        <span>${l.count} <span class="text-[10px] text-slate-400 font-normal">個</span></span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function drawDiscreteStrata() {
+            const viewportWidth = viewport.clientWidth;
+            const containerHeight = viewport.clientHeight;
+
+            let canvasWidth = viewportWidth;
+            let colWidth = 0;
+
+            if (viewMode === 'zoom') {
+                colWidth = Math.max(16, Math.min(32, Math.floor(viewportWidth / 20)));
+                canvasWidth = Math.max(viewportWidth, colWidth * N + 80);
+            } else {
+                canvasWidth = viewportWidth;
+            }
+
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = canvasWidth * dpr;
+            canvas.height = containerHeight * dpr;
+            canvas.style.width = `${canvasWidth}px`;
+            canvas.style.height = `${containerHeight}px`;
+
+            ctx.save();
+            ctx.scale(dpr, dpr);
+            ctx.clearRect(0, 0, canvasWidth, containerHeight);
+
+            const layers = getLegendreStats();
+            const maxValuation = layers.length;
+
+            const leftMargin = 45;
+            const rightMargin = 30;
+            const topMargin = 50; // Top Ground line position
+            const bottomMargin = 40;
+            const plotWidth = canvasWidth - leftMargin - rightMargin;
+            const plotHeight = containerHeight - topMargin - bottomMargin;
+
+            const unitX = plotWidth / N;
+            const maxLayersToShow = Math.max(maxValuation, 3);
+            const blockHeight = Math.min(60, plotHeight / maxLayersToShow);
+
+            // 1. Draw Top Ground Level (Reversed: 地表 at Top)
+            const groundY = topMargin;
+
+            ctx.beginPath();
+            ctx.moveTo(leftMargin - 10, groundY);
+            ctx.lineTo(canvasWidth - rightMargin + 10, groundY);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#64748b";
+            ctx.stroke();
+
+            // Ground Label
+            ctx.fillStyle = "#94a3b8";
+            ctx.font = "bold 10px JetBrains Mono";
+            ctx.textAlign = "right";
+            ctx.fillText("地表", leftMargin - 8, groundY + 4);
+
+            // Draw Subsurface Level lines (going DOWN downwards)
+            for (let lvl = 1; lvl <= maxValuation; lvl++) {
+                const y = groundY + lvl * blockHeight;
+                ctx.beginPath();
+                ctx.setLineDash([3, 3]);
+                ctx.moveTo(leftMargin, y);
+                ctx.lineTo(canvasWidth - rightMargin, y);
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = "rgba(71, 85, 105, 0.35)";
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                const color = strataGeology[lvl % strataGeology.length];
+                ctx.fillStyle = color.text;
+                ctx.font = "bold 10px JetBrains Mono";
+                ctx.textAlign = "right";
+                ctx.fillText(`第${lvl}層`, leftMargin - 8, y - 4);
+            }
+
+            // 2. Draw Inverted Strata Pillars (Layer 1 on Top, Layer 2 Below)
+            for (let k = 1; k <= N; k++) {
+                const val = getValuation(k, P);
+                const xCenter = leftMargin + (k - 0.5) * unitX;
+                const barWidth = Math.max(1, Math.min(unitX * 0.82, 24));
+                const isHovered = (hoveredNumber === k);
+
+                if (val > 0) {
+                    // Stack layers downward: lvl 1 is top-most
+                    for (let lvl = 1; lvl <= val; lvl++) {
+                        const color = strataGeology[lvl % strataGeology.length];
+                        const yTop = groundY + (lvl - 1) * blockHeight;
+
+                        const barX = xCenter - barWidth / 2;
+
+                        ctx.beginPath();
+                        ctx.rect(barX, yTop + 1, barWidth, blockHeight - 1);
+                        ctx.fillStyle = isHovered ? "#fbbf24" : color.bg;
+                        ctx.fill();
+
+                        ctx.lineWidth = isHovered ? 2 : 1;
+                        ctx.strokeStyle = isHovered ? "#ffffff" : color.border;
+                        ctx.stroke();
+                    }
+                } else {
+                    // Dot on ground line for numbers without prime p
+                    if (unitX > 4 || k % 5 === 0) {
+                        ctx.beginPath();
+                        ctx.arc(xCenter, groundY - 3, 1.2, 0, Math.PI * 2);
+                        ctx.fillStyle = "#334155";
+                        ctx.fill();
+                    }
+                }
+
+                // X-Axis Number Labels above Ground Line
+                let showTick = false;
+                if (viewMode === 'zoom') {
+                    showTick = true;
+                } else {
+                    const step = N <= 50 ? 5 : (N <= 200 ? 20 : (N <= 500 ? 50 : 100));
+                    showTick = (k === 1 || k === N || k % step === 0 || (val > 0 && k % Math.pow(P, Math.max(1, maxValuation - 1)) === 0));
+                }
+
+                if (showTick) {
+                    const isSpecialP = (val > 0);
+                    ctx.fillStyle = isSpecialP ? "#f59e0b" : "#64748b";
+                    ctx.font = isSpecialP ? "bold 10px JetBrains Mono" : "9px JetBrains Mono";
+                    ctx.textAlign = "center";
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(xCenter, groundY - 4);
+                    ctx.lineTo(xCenter, groundY);
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = isSpecialP ? "#f59e0b" : "#475569";
+                    ctx.stroke();
+
+                    ctx.fillText(k, xCenter, groundY - 8);
+                }
+            }
+
+            ctx.restore();
+        }
+
+        function handlePointerMove(e) {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+
+            const mouseX = clientX - rect.left;
+            const mouseY = clientY - rect.top;
+
+            const leftMargin = 45;
+            const rightMargin = 30;
+            const plotWidth = (canvas.width / (window.devicePixelRatio || 1)) - leftMargin - rightMargin;
+            const unitX = plotWidth / N;
+
+            if (mouseX >= leftMargin && mouseX <= leftMargin + plotWidth) {
+                const k = Math.min(N, Math.max(1, Math.ceil((mouseX - leftMargin) / unitX)));
+                
+                if (k !== hoveredNumber) {
+                    hoveredNumber = k;
+                    drawDiscreteStrata();
+                }
+
+                const val = getValuation(k, P);
+                const tooltip = document.getElementById('columnTooltip');
+                
+                document.getElementById('tooltipNumber').innerText = `数値 : ${k}`;
+                
+                let temp = k;
+                let factors = [];
+                let pCount = 0;
+                while (temp % P === 0) {
+                    pCount++;
+                    temp /= P;
+                }
+                if (pCount > 0) {
+                    factors.push(`${P}<sup>${pCount}</sup>`);
+                }
+                if (temp > 1) {
+                    factors.push(`${temp}`);
+                }
+                const factorText = factors.length > 0 ? `${k} = ${factors.join(' × ')}` : `${k}`;
+                document.getElementById('tooltipFactorization').innerHTML = factorText;
+
+                if (val > 0) {
+                    document.getElementById('tooltipValuation').innerHTML = `素因数 ${P} を <strong class="text-amber-300 font-mono">${val} 個</strong> 保持`;
+                    
+                    let breakdownHtml = '';
+                    for (let l = 1; l <= val; l++) {
+                        const pPow = Math.pow(P, l);
+                        breakdownHtml += `<div>• 第 ${l} 層 (深さ${l}): ${pPow} の倍数</div>`;
+                    }
+                    document.getElementById('tooltipBreakdown').innerHTML = breakdownHtml;
+                } else {
+                    document.getElementById('tooltipValuation').innerHTML = `<span class="text-slate-400">素因数 ${P} を持ちません</span>`;
+                    document.getElementById('tooltipBreakdown').innerHTML = `<div>※ 地層なし</div>`;
+                }
+
+                const tooltipX = Math.min(Math.max(10, mouseX - 100), rect.width - 210);
+                const tooltipY = Math.min(rect.height - 130, Math.max(10, mouseY + 15));
+
+                tooltip.style.left = `${tooltipX}px`;
+                tooltip.style.top = `${tooltipY}px`;
+                tooltip.classList.remove('hidden');
+
+            } else {
+                clearPointer();
+            }
+        }
+
+        function clearPointer() {
+            hoveredNumber = -1;
+            document.getElementById('columnTooltip').classList.add('hidden');
+            drawDiscreteStrata();
+        }
+    </script>
+</body>
+</html>
