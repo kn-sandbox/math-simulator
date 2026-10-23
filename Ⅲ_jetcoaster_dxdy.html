@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ジェットコースターで学ぶ微分と導関数 | 高校数学Ⅲ</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#151e2e', 900: '#0f172a' }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- KaTeX CSS & JS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        canvas {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-sky-500 selection:text-white">
+
+    <!-- ヘッダー -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 backdrop-blur bg-opacity-80">
+        <div class="max-w-7xl mx-auto px-4 py-3 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="bg-gradient-to-tr from-amber-500 via-rose-500 to-indigo-600 text-white font-black p-2.5 rounded-xl text-xl shadow-lg shadow-rose-500/20">
+                    🎢
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                        ジェットコースター $\times$ 導関数
+                        <span class="text-xs bg-rose-500/20 text-rose-400 border border-rose-500/30 font-normal px-2.5 py-0.5 rounded-full">数学Ⅲ 微分</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">位置 $y = f(x)$ と 傾き・速さ $y = f'(x)$ のリアルタイム直感シミュレータ</p>
+                </div>
+            </div>
+            <div class="text-xs text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+                高校3年生 数学Ⅲ / 関数の増減と導関数
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- コントロール & アニメーションバー -->
+        <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 backdrop-blur shadow-xl grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+            
+            <!-- 再生/停止ボタン -->
+            <div class="md:col-span-3 flex items-center gap-2">
+                <button id="btn-play" onclick="togglePlay()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold py-2.5 px-4 rounded-xl shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2 text-sm">
+                    <span id="play-icon">▶</span> <span id="play-text">自動走行スタート</span>
+                </button>
+                <button onclick="resetPosition()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 p-2.5 rounded-xl transition text-sm" title="最初に戻る">
+                    ↺
+                </button>
+            </div>
+
+            <!-- X軸スライダー (手動操作) -->
+            <div class="md:col-span-6 space-y-1">
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-300 font-semibold flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+                        コース上の位置 $x$:
+                    </span>
+                    <span id="val-x-text" class="text-amber-400 font-mono font-bold text-sm">0.00</span>
+                </div>
+                <input type="range" id="slider-x" min="-3" max="3" step="0.01" value="0" oninput="onXSliderChange(this.value)" class="w-full accent-amber-500 bg-slate-700 h-2.5 rounded-lg cursor-pointer">
+            </div>
+
+            <!-- 速度コントロール -->
+            <div class="md:col-span-3 flex items-center gap-3">
+                <span class="text-xs text-slate-400 whitespace-nowrap">走行速度:</span>
+                <input type="range" id="slider-speed" min="0.2" max="2.5" step="0.1" value="1.0" class="w-full accent-sky-500 bg-slate-700 h-2 rounded-lg cursor-pointer">
+            </div>
+        </div>
+
+        <!-- メイン2コラムレイアウト -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- 左側: プリセット＆ステータス (4コラム) -->
+            <div class="lg:col-span-4 space-y-5">
+                
+                <!-- 1. 関数コース選択 -->
+                <div class="bg-slate-800/40 border border-slate-700/60 p-5 rounded-2xl space-y-4 shadow-lg">
+                    <h2 class="text-base font-bold text-white flex items-center justify-between border-b border-slate-700 pb-2">
+                        <span>1. コース（関数 $f(x)$）の選択</span>
+                        <span class="text-xs text-rose-400 font-normal">数学Ⅲ 15種プリセット</span>
+                    </h2>
+
+                    <div>
+                        <select id="func-preset" onchange="onFunctionChange()" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:ring-2 focus:ring-rose-500 focus:outline-none cursor-pointer">
+                            <optgroup label="1. 多項式関数">
+                                <option value="cubic">1. 3次関数: f(x) = x³ - 3x (定番の山と谷)</option>
+                                <option value="quartic_w">2. 4次関数: f(x) = x⁴ - 4x² (W型ダブル絶叫)</option>
+                                <option value="inflection">3. 3次変曲: f(x) = (x-1)³ + 1 (傾き0の踊り場)</option>
+                            </optgroup>
+                            <optgroup label="2. 三角関数">
+                                <option value="sin">4. サイン波: f(x) = 2 sin(x) (連続ウェーブ)</option>
+                                <option value="cos">5. コサイン波: f(x) = 2 cos(x) (頂点スタート)</option>
+                                <option value="composite_trig">6. 合成波: f(x) = sin(x) + sin(2x) (複合ウェーブ)</option>
+                            </optgroup>
+                            <optgroup label="3. 指数・対数・無理関数">
+                                <option value="exp_growth">7. 指数急登: f(x) = 0.5 e^x - 2 (一気に加速上昇)</option>
+                                <option value="log_climb">8. 対数関数: f(x) = 2 ln(x + 3) (徐々に緩やか)</option>
+                                <option value="sqrt_hill">9. 無理関数: f(x) = 3 √(x + 4) - 3 (頂点へ安定登坂)</option>
+                            </optgroup>
+                            <optgroup label="4. 複合・極限系（絶叫・減衰コース）">
+                                <option value="decay">10. 減衰振動: f(x) = 3 e^(-0.3x) sin(2x) (揺れが収まる)</option>
+                                <option value="gaussian">11. ガウスドーム: f(x) = 3 e^(-x²) (一発大ジャンプ)</option>
+                                <option value="rational">12. 分数関数: f(x) = 4x / (x² + 1) (滑らかな丘と崖)</option>
+                                <option value="logistic">13. ロジスティック: f(x) = 4 / (1 + e^(-x)) - 2 (S字坂道)</option>
+                                <option value="damping">14. ダンピング降下: f(x) = e^(-0.2x) cos(3x) + x/2 (振動降下)</option>
+                                <option value="smooth_steep">15. 滑らかS字急勾配: f(x) = 2x / √(x² + 1) (超絶急勾配)</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <!-- KaTeX数式表示 -->
+                    <div class="p-3.5 bg-slate-900/90 rounded-xl border border-slate-700/80 space-y-2.5">
+                        <div>
+                            <span class="text-[10px] text-sky-400 font-semibold uppercase tracking-wider block">位置・高度関数 $f(x)$</span>
+                            <div id="math-fx" class="text-base font-bold text-sky-300 py-0.5 overflow-x-auto"></div>
+                        </div>
+                        <div class="border-t border-slate-800 pt-2">
+                            <span class="text-[10px] text-rose-400 font-semibold uppercase tracking-wider block">導関数・傾き $f'(x)$</span>
+                            <div id="math-fpx" class="text-base font-bold text-rose-300 py-0.5 overflow-x-auto"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. リアルタイム・スリルメーター（微分値の情報） -->
+                <div class="bg-slate-800/40 border border-slate-700/60 p-5 rounded-2xl space-y-4 shadow-lg">
+                    <h2 class="text-base font-bold text-white border-b border-slate-700 pb-2 flex justify-between items-center">
+                        <span>2. 現在の走行状態</span>
+                        <span id="status-badge" class="text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">平坦 / 極値</span>
+                    </h2>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <!-- 位置高度 f(x) -->
+                        <div class="bg-slate-900/80 p-3 rounded-xl border border-sky-500/30 text-center">
+                            <div class="text-[11px] text-sky-400 font-semibold">コースの高さ $f(x)$</div>
+                            <div id="stat-fx" class="text-xl font-mono font-bold text-white mt-1">0.000</div>
+                        </div>
+
+                        <!-- 傾き f'(x) -->
+                        <div class="bg-slate-900/80 p-3 rounded-xl border border-rose-500/30 text-center">
+                            <div class="text-[11px] text-rose-400 font-semibold">コースの傾き $f'(x)$</div>
+                            <div id="stat-fpx" class="text-xl font-mono font-bold text-white mt-1">0.000</div>
+                        </div>
+                    </div>
+
+                    <!-- 傾き角度 & 体感スリルバー -->
+                    <div class="space-y-2 pt-1">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-300">傾斜角度 ($\theta$):</span>
+                            <span id="stat-angle" class="font-mono text-white font-bold">0.0°</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-300">体感スリル度 (G-Force):</span>
+                            <span id="stat-thrill-text" class="font-mono text-rose-400 font-bold">Normal</span>
+                        </div>
+                        <!-- スリル度ゲージ -->
+                        <div class="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-slate-700">
+                            <div id="thrill-bar" class="h-full bg-gradient-to-r from-emerald-400 via-amber-400 to-rose-500 rounded-full transition-all duration-150" style="width: 10%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 右側: 上下2段グラフィック描画 (8コラム) -->
+            <div class="lg:col-span-8 space-y-4">
+                
+                <div class="bg-slate-900 border border-slate-700/80 rounded-2xl p-4 space-y-4 shadow-2xl">
+                    
+                    <!-- 上段 Canvas: コース f(x) と ジェットコースター -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5 px-1">
+                            <span class="text-xs font-bold text-sky-300 flex items-center gap-1.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block"></span>
+                                上段：ジェットコースターのコース $y = f(x)$ と 接線（傾き）
+                            </span>
+                            <span class="text-[11px] text-slate-400">🎢 接線方向に沿って車体が回転</span>
+                        </div>
+                        <div class="relative w-full aspect-[2.2/1] bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-inner">
+                            <canvas id="canvas-fx" class="w-full h-full block"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 下段 Canvas: 導関数 f'(x) -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5 px-1">
+                            <span class="text-xs font-bold text-rose-300 flex items-center gap-1.5">
+                                <span class="w-2.5 h-2.5 rounded-full bg-rose-400 inline-block"></span>
+                                下段：導関数 $y = f'(x)$（各地点の「傾きの大きさ」をプロット）
+                            </span>
+                            <div class="flex items-center gap-2 text-[10px]">
+                                <span class="text-emerald-400">登り ($f'>0$)</span>
+                                <span class="text-amber-300">平坦/頂点 ($f'=0$)</span>
+                                <span class="text-rose-400">急降下 ($f'<0$)</span>
+                            </div>
+                        </div>
+                        <div class="relative w-full aspect-[2.8/1] bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-inner">
+                            <canvas id="canvas-fpx" class="w-full h-full block"></canvas>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 直感解説カード -->
+                <div class="bg-slate-800/40 border border-slate-700/60 p-4 rounded-2xl text-xs text-slate-300 leading-relaxed grid grid-cols-1 sm:grid-cols-3 gap-3 shadow-lg">
+                    <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-700/50">
+                        <div class="font-bold text-emerald-400 mb-1 flex items-center gap-1">
+                            <span>① 登り坂</span> <span class="text-[10px] bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-300">$f'(x) > 0$</span>
+                        </div>
+                        コースを登っているとき、導関数 $f'(x)$ のグラフは <strong class="text-emerald-400">X軸より上側</strong> に位置します。
+                    </div>
+                    <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-700/50">
+                        <div class="font-bold text-amber-300 mb-1 flex items-center gap-1">
+                            <span>② 頂点・谷</span> <span class="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-300">$f'(x) = 0$</span>
+                        </div>
+                        コースが一瞬水平（極大・極小）になるとき、導関数 $f'(x)$ は <strong class="text-amber-300">X軸とちょうど交差</strong> します。
+                    </div>
+                    <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-700/50">
+                        <div class="font-bold text-rose-400 mb-1 flex items-center gap-1">
+                            <span>③ 急降下</span> <span class="text-[10px] bg-rose-500/20 px-1.5 py-0.5 rounded text-rose-300">$f'(x) < 0$</span>
+                        </div>
+                        コースを急降下するとき、導関数 $f'(x)$ は <strong class="text-rose-400">X軸より下側</strong> に深く沈み込みます。
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <footer class="bg-slate-900 border-t border-slate-800 py-6 text-center text-xs text-slate-500">
+        ジェットコースターで学ぶ微分と導関数 &copy; 2026 | 高校数学Ⅲ 直感探究アプリ
+    </footer>
+
+    <!-- アプリケーションロジック -->
+    <script>
+        // 関数・導関数 15種データベース
+        const presets = {
+            // 1. 多項式関数
+            cubic: {
+                name: "3次関数（基本の山と谷）",
+                fLatex: "f(x) = x^3 - 3x",
+                fpxLatex: "f'(x) = 3x^2 - 3",
+                f: x => Math.pow(x, 3) - 3 * x,
+                fpx: x => 3 * Math.pow(x, 2) - 3,
+                xMin: -2.5, xMax: 2.5, yMin: -3.5, yMax: 3.5, fpxMin: -4.0, fpxMax: 6.0
+            },
+            quartic_w: {
+                name: "4次関数（W型のダブル絶叫コース）",
+                fLatex: "f(x) = x^4 - 4x^2",
+                fpxLatex: "f'(x) = 4x^3 - 8x",
+                f: x => Math.pow(x, 4) - 4 * Math.pow(x, 2),
+                fpx: x => 4 * Math.pow(x, 3) - 8 * x,
+                xMin: -2.3, xMax: 2.3, yMin: -4.5, yMax: 3.0, fpxMin: -10.0, fpxMax: 10.0
+            },
+            inflection: {
+                name: "3次関数（変曲点・f'(x)=0の踊り場）",
+                fLatex: "f(x) = (x-1)^3 + 1",
+                fpxLatex: "f'(x) = 3(x-1)^2",
+                f: x => Math.pow(x - 1, 3) + 1,
+                fpx: x => 3 * Math.pow(x - 1, 2),
+                xMin: -1.0, xMax: 3.0, yMin: -2.0, yMax: 4.0, fpxMin: -1.0, fpxMax: 8.0
+            },
+
+            // 2. 三角関数
+            sin: {
+                name: "三角関数 正弦波（連続ウェーブ）",
+                fLatex: "f(x) = 2 \\sin(x)",
+                fpxLatex: "f'(x) = 2 \\cos(x)",
+                f: x => 2 * Math.sin(x),
+                fpx: x => 2 * Math.cos(x),
+                xMin: -3.5, xMax: 3.5, yMin: -2.5, yMax: 2.5, fpxMin: -2.5, fpxMax: 2.5
+            },
+            cos: {
+                name: "三角関数 コサイン波",
+                fLatex: "f(x) = 2 \\cos(x)",
+                fpxLatex: "f'(x) = -2 \\sin(x)",
+                f: x => 2 * Math.cos(x),
+                fpx: x => -2 * Math.sin(x),
+                xMin: -3.5, xMax: 3.5, yMin: -2.5, yMax: 2.5, fpxMin: -2.5, fpxMax: 2.5
+            },
+            composite_trig: {
+                name: "三角関数の合成波",
+                fLatex: "f(x) = \\sin(x) + \\sin(2x)",
+                fpxLatex: "f'(x) = \\cos(x) + 2\\cos(2x)",
+                f: x => Math.sin(x) + Math.sin(2 * x),
+                fpx: x => Math.cos(x) + 2 * Math.cos(2 * x),
+                xMin: -3.2, xMax: 3.2, yMin: -2.2, yMax: 2.2, fpxMin: -3.2, fpxMax: 3.2
+            },
+
+            // 3. 指数・対数・無理関数
+            exp_growth: {
+                name: "指数関数的急登（一気に加速）",
+                fLatex: "f(x) = 0.5 e^{x} - 2",
+                fpxLatex: "f'(x) = 0.5 e^{x}",
+                f: x => 0.5 * Math.exp(x) - 2,
+                fpx: x => 0.5 * Math.exp(x),
+                xMin: -2.5, xMax: 2.5, yMin: -2.5, yMax: 4.5, fpxMin: -0.5, fpxMax: 6.5
+            },
+            log_climb: {
+                name: "対数関数（緩やかな登り坂）",
+                fLatex: "f(x) = 2 \\ln(x + 3)",
+                fpxLatex: "f'(x) = \\frac{2}{x + 3}",
+                f: x => 2 * Math.log(x + 3),
+                fpx: x => 2 / (x + 3),
+                xMin: -2.5, xMax: 3.5, yMin: -1.0, yMax: 4.0, fpxMin: -0.2, fpxMax: 4.0
+            },
+            sqrt_hill: {
+                name: "無理関数（徐々に傾きが平坦になる山）",
+                fLatex: "f(x) = 3 \\sqrt{x + 4} - 3",
+                fpxLatex: "f'(x) = \\frac{3}{2\\sqrt{x + 4}}",
+                f: x => 3 * Math.sqrt(x + 4) - 3,
+                fpx: x => 1.5 / Math.sqrt(x + 4),
+                xMin: -3.8, xMax: 4.0, yMin: -3.0, yMax: 5.0, fpxMin: -0.2, fpxMax: 3.5
+            },
+
+            // 4. 複合・極限系
+            decay: {
+                name: "減衰振動（揺れが収まるコース）",
+                fLatex: "f(x) = 3 e^{-0.3x} \\sin(2x)",
+                fpxLatex: "f'(x) = 3 e^{-0.3x} (2\\cos(2x) - 0.3\\sin(2x))",
+                f: x => 3 * Math.exp(-0.3 * x) * Math.sin(2 * x),
+                fpx: x => 3 * Math.exp(-0.3 * x) * (2 * Math.cos(2 * x) - 0.3 * Math.sin(2 * x)),
+                xMin: -0.8, xMax: 4.0, yMin: -2.5, yMax: 3.5, fpxMin: -4.5, fpxMax: 6.5
+            },
+            gaussian: {
+                name: "ガウス型ドーム（一発大ジャンプ山）",
+                fLatex: "f(x) = 3 e^{-x^2}",
+                fpxLatex: "f'(x) = -6x e^{-x^2}",
+                f: x => 3 * Math.exp(-x * x),
+                fpx: x => -6 * x * Math.exp(-x * x),
+                xMin: -2.5, xMax: 2.5, yMin: -0.5, yMax: 3.5, fpxMin: -3.0, fpxMax: 3.0
+            },
+            rational: {
+                name: "分数関数（滑らかな丘と崖）",
+                fLatex: "f(x) = \\frac{4x}{x^2 + 1}",
+                fpxLatex: "f'(x) = \\frac{4(1 - x^2)}{(x^2 + 1)^2}",
+                f: x => (4 * x) / (x * x + 1),
+                fpx: x => (4 * (1 - x * x)) / Math.pow(x * x + 1, 2),
+                xMin: -3.5, xMax: 3.5, yMin: -2.5, yMax: 2.5, fpxMin: -1.5, fpxMax: 4.5
+            },
+            logistic: {
+                name: "ロジスティック曲線（S字坂道）",
+                fLatex: "f(x) = \\frac{4}{1 + e^{-x}} - 2",
+                fpxLatex: "f'(x) = \\frac{4 e^{-x}}{(1 + e^{-x})^2}",
+                f: x => (4 / (1 + Math.exp(-x))) - 2,
+                fpx: x => (4 * Math.exp(-x)) / Math.pow(1 + Math.exp(-x), 2),
+                xMin: -4.0, xMax: 4.0, yMin: -2.5, yMax: 2.5, fpxMin: -0.2, fpxMax: 1.5
+            },
+            damping: {
+                name: "ダンピングコース（振動しながら降下）",
+                fLatex: "f(x) = e^{-0.2x} \\cos(3x) + 0.5x",
+                fpxLatex: "f'(x) = -0.2 e^{-0.2x} \\cos(3x) - 3 e^{-0.2x} \\sin(3x) + 0.5",
+                f: x => Math.exp(-0.2 * x) * Math.cos(3 * x) + 0.5 * x,
+                fpx: x => -0.2 * Math.exp(-0.2 * x) * Math.cos(3 * x) - 3 * Math.exp(-0.2 * x) * Math.sin(3 * x) + 0.5,
+                xMin: -1.0, xMax: 4.0, yMin: -1.5, yMax: 3.0, fpxMin: -3.5, fpxMax: 3.5
+            },
+            smooth_steep: {
+                name: "滑らかなS字急勾配",
+                fLatex: "f(x) = \\frac{2x}{\\sqrt{x^2 + 1}}",
+                fpxLatex: "f'(x) = \\frac{2}{(x^2 + 1)^{3/2}}",
+                f: x => (2 * x) / Math.sqrt(x * x + 1),
+                fpx: x => 2 / Math.pow(x * x + 1, 1.5),
+                xMin: -3.5, xMax: 3.5, yMin: -2.5, yMax: 2.5, fpxMin: -0.2, fpxMax: 2.5
+            }
+        };
+
+        let currentKey = 'cubic';
+        let currentX = 0;
+        let isPlaying = false;
+        let animationFrameId = null;
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ]
+            });
+
+            window.addEventListener('resize', drawAll);
+            onFunctionChange();
+        });
+
+        // プリセット切替
+        function onFunctionChange() {
+            currentKey = document.getElementById('func-preset').value;
+            const item = presets[currentKey];
+
+            // KaTeX数式レンダリング
+            katex.render(item.fLatex, document.getElementById('math-fx'));
+            katex.render(item.fpxLatex, document.getElementById('math-fpx'));
+
+            // スライダー調整
+            const sliderX = document.getElementById('slider-x');
+            sliderX.min = item.xMin;
+            sliderX.max = item.xMax;
+            currentX = item.xMin;
+            sliderX.value = currentX;
+
+            updateStateAndDraw();
+        }
+
+        // Xスライダー変更時
+        function onXSliderChange(val) {
+            currentX = parseFloat(val);
+            if (isPlaying) stopAnimation();
+            updateStateAndDraw();
+        }
+
+        // アニメーション再生・停止
+        function togglePlay() {
+            if (isPlaying) {
+                stopAnimation();
+            } else {
+                startAnimation();
+            }
+        }
+
+        function startAnimation() {
+            isPlaying = true;
+            document.getElementById('play-text').innerText = "一時停止";
+            document.getElementById('play-icon').innerText = "⏸";
+            document.getElementById('btn-play').classList.remove('from-emerald-500', 'to-teal-600');
+            document.getElementById('btn-play').classList.add('from-amber-500', 'to-orange-600');
+            animateLoop();
+        }
+
+        function stopAnimation() {
+            isPlaying = false;
+            document.getElementById('play-text').innerText = "自動走行スタート";
+            document.getElementById('play-icon').innerText = "▶";
+            document.getElementById('btn-play').classList.remove('from-amber-500', 'to-orange-600');
+            document.getElementById('btn-play').classList.add('from-emerald-500', 'to-teal-600');
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        }
+
+        function resetPosition() {
+            const item = presets[currentKey];
+            currentX = item.xMin;
+            document.getElementById('slider-x').value = currentX;
+            updateStateAndDraw();
+        }
+
+        function animateLoop() {
+            if (!isPlaying) return;
+
+            const item = presets[currentKey];
+            const speed = parseFloat(document.getElementById('slider-speed').value);
+            const step = 0.012 * speed;
+
+            currentX += step;
+            if (currentX > item.xMax) {
+                currentX = item.xMin;
+            }
+
+            document.getElementById('slider-x').value = currentX;
+            updateStateAndDraw();
+
+            animationFrameId = requestAnimationFrame(animateLoop);
+        }
+
+        // 状態更新と描画
+        function updateStateAndDraw() {
+            const item = presets[currentKey];
+            const fxVal = item.f(currentX);
+            const fpxVal = item.fpx(currentX);
+
+            // テキスト数値反映
+            document.getElementById('val-x-text').innerText = currentX.toFixed(2);
+            document.getElementById('stat-fx').innerText = fxVal.toFixed(3);
+            document.getElementById('stat-fpx').innerText = fpxVal.toFixed(3);
+
+            // 傾き角度（ラジアン -> 度）
+            const angleRad = Math.atan(fpxVal);
+            const angleDeg = (angleRad * 180 / Math.PI);
+            document.getElementById('stat-angle').innerText = `${angleDeg.toFixed(1)}°`;
+
+            // ステータスバッジ＆スリル度の計算
+            const badge = document.getElementById('status-badge');
+            const absFpx = Math.abs(fpxVal);
+
+            let thrillPercent = Math.min(100, (absFpx / 3.0) * 100);
+            document.getElementById('thrill-bar').style.width = `${Math.max(8, thrillPercent)}%`;
+
+            if (absFpx < 0.15) {
+                badge.innerText = "平坦 / 極値";
+                badge.className = "text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30";
+                document.getElementById('stat-thrill-text').innerText = "Normal (0G)";
+                document.getElementById('stat-thrill-text').className = "font-mono text-amber-300 font-bold";
+            } else if (fpxVal > 0) {
+                badge.innerText = "登り坂 ↗";
+                badge.className = "text-xs px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+                document.getElementById('stat-thrill-text').innerText = `Climbing (+${(absFpx*0.5).toFixed(1)}G)`;
+                document.getElementById('stat-thrill-text').className = "font-mono text-emerald-400 font-bold";
+            } else {
+                badge.innerText = "急降下! ↘";
+                badge.className = "text-xs px-2.5 py-0.5 rounded-full font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse";
+                document.getElementById('stat-thrill-text').innerText = `Thrill Drop! (-${(absFpx*0.8).toFixed(1)}G)`;
+                document.getElementById('stat-thrill-text').className = "font-mono text-rose-400 font-bold";
+            }
+
+            drawAll();
+        }
+
+        // 描画統括
+        function drawAll() {
+            const item = presets[currentKey];
+            drawFxCanvas(item);
+            drawFpxCanvas(item);
+        }
+
+        // 上段 Canvas 描画: f(x) と ジェットコースター
+        function drawFxCanvas(item) {
+            const canvas = document.getElementById('canvas-fx');
+            const rect = canvas.parentNode.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+
+            const ctx = canvas.getContext('2d');
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            const W = rect.width;
+            const H = rect.height;
+
+            ctx.clearRect(0, 0, W, H);
+
+            const xMin = item.xMin, xMax = item.xMax;
+            const yMin = item.yMin, yMax = item.yMax;
+
+            const toX = x => ((x - xMin) / (xMax - xMin)) * W;
+            const toY = y => H - ((y - yMin) / (yMax - yMin)) * H;
+
+            // 1. グリッドと軸
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, toY(0)); ctx.lineTo(W, toY(0));
+            ctx.moveTo(toX(0), 0); ctx.lineTo(toX(0), H);
+            ctx.stroke();
+
+            // 2. コース（コースのレール表現）
+            ctx.strokeStyle = '#0284c7';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            let started = false;
+            for (let px = 0; px <= W; px += 2) {
+                const x = xMin + (px / W) * (xMax - xMin);
+                const y = item.f(x);
+                if (!isNaN(y)) {
+                    if (!started) { ctx.moveTo(px, toY(y)); started = true; }
+                    else { ctx.lineTo(px, toY(y)); }
+                }
+            }
+            ctx.stroke();
+
+            // レール（主線）
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+
+            // 3. 現在位置での接線（Tangent line）
+            const fxVal = item.f(currentX);
+            const fpxVal = item.fpx(currentX);
+            const cx = toX(currentX);
+            const cy = toY(fxVal);
+
+            const tanLength = 60; // ピクセル長
+            const angle = Math.atan(fpxVal);
+            const dx = Math.cos(angle) * tanLength;
+            const dy = -Math.sin(angle) * tanLength;
+
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(cx - dx, cy - dy);
+            ctx.lineTo(cx + dx, cy + dy);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 4. 下段との連結ガイドライン（垂直破線）
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx, H);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 5. ジェットコースター車体の描画
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(-angle);
+
+            // 車体ボディ
+            ctx.fillStyle = '#f43f5e';
+            ctx.beginPath();
+            ctx.roundRect(-18, -14, 36, 16, 5);
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // 乗客イメージ
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath(); ctx.arc(-7, -11, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(7, -11, 4, 0, Math.PI * 2); ctx.fill();
+
+            // 車輪
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath(); ctx.arc(-11, 2, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(11, 2, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#94a3b8';
+            ctx.beginPath(); ctx.arc(-11, 2, 1.5, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(11, 2, 1.5, 0, Math.PI * 2); ctx.fill();
+
+            ctx.restore();
+        }
+
+        // 下段 Canvas 描画: 導関数 f'(x)
+        function drawFpxCanvas(item) {
+            const canvas = document.getElementById('canvas-fpx');
+            const rect = canvas.parentNode.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+
+            const ctx = canvas.getContext('2d');
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            const W = rect.width;
+            const H = rect.height;
+
+            ctx.clearRect(0, 0, W, H);
+
+            const xMin = item.xMin, xMax = item.xMax;
+            const fpxMin = item.fpxMin, fpxMax = item.fpxMax;
+
+            const toX = x => ((x - xMin) / (xMax - xMin)) * W;
+            const toY = y => H - ((y - fpxMin) / (fpxMax - fpxMin)) * H;
+
+            // 1. グリッド & Y=0 基準線
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(toX(0), 0); ctx.lineTo(toX(0), H);
+            ctx.stroke();
+
+            // Y=0 軸 (黄色ハイライト)
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.6)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(0, toY(0)); ctx.lineTo(W, toY(0));
+            ctx.stroke();
+
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = '10px monospace';
+            ctx.fillText("f'(x) = 0 (傾きゼロ)", 10, toY(0) - 5);
+
+            // 2. 導関数 f'(x) カーブ描画
+            const steps = 200;
+            const dxStep = (xMax - xMin) / steps;
+
+            for (let i = 0; i < steps; i++) {
+                const x1 = xMin + i * dxStep;
+                const x2 = x1 + dxStep;
+                const y1 = item.fpx(x1);
+                const y2 = item.fpx(x2);
+
+                if (!isNaN(y1) && !isNaN(y2)) {
+                    ctx.beginPath();
+                    ctx.moveTo(toX(x1), toY(y1));
+                    ctx.lineTo(toX(x2), toY(y2));
+                    ctx.lineWidth = 2.5;
+
+                    const midY = (y1 + y2) / 2;
+                    if (midY > 0.05) {
+                        ctx.strokeStyle = '#10b981'; // emerald
+                    } else if (midY < -0.05) {
+                        ctx.strokeStyle = '#f43f5e'; // rose
+                    } else {
+                        ctx.strokeStyle = '#fbbf24'; // amber
+                    }
+                    ctx.stroke();
+                }
+            }
+
+            // 3. 上段からの連携ポインター
+            const cx = toX(currentX);
+            const currentFpx = item.fpx(currentX);
+            const cy = toY(currentFpx);
+
+            // 垂直破線
+            ctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(cx, 0);
+            ctx.lineTo(cx, cy);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 現在の f'(x) プロット点
+            ctx.fillStyle = Math.abs(currentFpx) < 0.15 ? '#fbbf24' : (currentFpx > 0 ? '#10b981' : '#f43f5e');
+            ctx.beginPath();
+            ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 値吹出し
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px monospace';
+            ctx.fillText(`f'(${currentX.toFixed(2)}) = ${currentFpx.toFixed(2)}`, cx + 8, cy < 25 ? cy + 15 : cy - 8);
+        }
+    </script>
+</body>
+</html>
