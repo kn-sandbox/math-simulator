@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>複素数の周期性・1のn乗根マスター</title>
+  
+  <!-- KaTeX for math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 12px 8px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 10px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #38bdf8;
+      margin-bottom: 4px;
+    }
+
+    p.subtitle {
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+
+    /* メインコンテナ */
+    .app-container {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+    }
+
+    /* コントロールパネル */
+    .controls-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 10px 12px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .selector-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .selector-row label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      white-space: nowrap;
+    }
+
+    select {
+      background: #334155;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      outline: none;
+      font-weight: 600;
+    }
+
+    .toggle-group {
+      display: flex;
+      background: #0f172a;
+      padding: 2px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+    }
+
+    .toggle-tab {
+      padding: 6px 12px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      color: #94a3b8;
+      border: none;
+      background: transparent;
+      transition: all 0.2s;
+    }
+
+    .toggle-tab.active {
+      background: #0284c7;
+      color: #ffffff;
+    }
+
+    /* 現在のステータスカード */
+    .status-card {
+      background: #1e293b;
+      border: 1px solid #0284c7;
+      border-radius: 12px;
+      padding: 10px 14px;
+      width: 100%;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 65px;
+    }
+
+    .status-title {
+      font-size: 0.75rem;
+      color: #38bdf8;
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+
+    .status-math {
+      font-size: 0.95rem;
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow-x: auto;
+      max-width: 100%;
+    }
+
+    /* 基本等式情報カード（新設） */
+    .identity-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 10px 14px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .identity-title {
+      font-size: 0.75rem;
+      color: #38bdf8;
+      font-weight: bold;
+    }
+
+    .identity-content {
+      font-size: 0.9rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    /* ホイール・ビジュアルエリア */
+    .wheel-section {
+      position: relative;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 6px 0;
+    }
+
+    /* ターゲット（上部）インジケーター */
+    .target-marker {
+      position: absolute;
+      top: 0px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 9px solid transparent;
+      border-right: 9px solid transparent;
+      border-top: 13px solid #f43f5e;
+      z-index: 10;
+    }
+
+    /* 回転する大きな円盤 */
+    .wheel-container {
+      width: 260px;
+      height: 260px;
+      position: relative;
+      border-radius: 50%;
+      border: 2px dashed #475569;
+      transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    /* ノード（各複素数の丸ボタン） */
+    .node {
+      position: absolute;
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 0.7rem;
+      background-color: #1e293b;
+      border: 2.5px solid #64748b;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+      margin-left: -31px;
+      margin-top: -31px;
+    }
+
+    /* ノード内のテキスト（親の回転と逆回転して常に直立） */
+    .node-content {
+      transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+      width: 100%;
+      height: 100%;
+      padding: 2px;
+      text-align: center;
+    }
+
+    /* 操作ボタンエリア */
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .btn-spin {
+      flex: 2;
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 1.05rem;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+    }
+
+    .btn-reset {
+      flex: 1;
+      background: #334155;
+      color: #cbd5e1;
+      border: 1px solid #475569;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    /* 凡例 */
+    .legend-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 8px 12px;
+      width: 100%;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      text-align: center;
+    }
+
+    /* 共役ペアのカラーセット */
+    .pair-real { border-color: #94a3b8 !important; background-color: #1e293b !important; }
+    .pair-1 { border-color: #38bdf8 !important; background-color: #0c4a6e !important; }
+    .pair-2 { border-color: #f43f5e !important; background-color: #881337 !important; }
+    .pair-3 { border-color: #a855f7 !important; background-color: #581c87 !important; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>ぐるぐるまわる1のn乗根</h1>
+    <p class="subtitle">掛けるたびにぐるぐる回転</p>
+  </header>
+
+  <div class="app-container">
+    
+    <!-- 設定コントロール -->
+    <div class="controls-card">
+      <div class="selector-row">
+        <label for="periodSelect">周期（1のn乗根）:</label>
+        <select id="periodSelect" onchange="changePeriod()">
+          <option value="3">3周期 (ω オメガ)</option>
+          <option value="4" selected>4周期 (i 虚数単位)</option>
+          <option value="5">5周期 (ζ ゼータ)</option>
+          <option value="6">6周期 (η エータ)</option>
+          <option value="7">7周期 (θ シータ)</option>
+          <option value="8">8周期 (φ ファイ)</option>
+        </select>
+      </div>
+
+      <div class="selector-row">
+        <label>○の中身:</label>
+        <div class="toggle-group">
+          <button class="toggle-tab active" id="tabSymbol" onclick="setDisplayMode('symbol')">記号</button>
+          <button class="toggle-tab" id="tabValue" onclick="setDisplayMode('value')">具体的な数値</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 現在の位置・値表示 -->
+    <div class="status-card">
+      <div class="status-title" id="statusStepTitle">現在の値 (掛け算 0 回)</div>
+      <div class="status-math" id="statusMath"></div>
+    </div>
+
+    <!-- ホイールアニメーション表示部 -->
+    <div class="wheel-section">
+      <div class="target-marker"></div>
+      <div class="wheel-container" id="wheel"></div>
+    </div>
+
+    <!-- 操作ボタン -->
+    <div class="action-buttons">
+      <button class="btn-spin" onclick="spinNext()">1回掛ける (時計回り)</button>
+      <button class="btn-reset" onclick="resetSpin()">リセット</button>
+    </div>
+
+    <!-- 各周期の基本等式情報（追加されたエリア） -->
+    <div class="identity-card">
+      <div class="identity-title">📌 この周期の基本等式</div>
+      <div class="identity-content" id="identityMath"></div>
+    </div>
+
+    <!-- 凡例説明 -->
+    <div class="legend-card">
+      💡 <b>色分け</b>: 同じ色の〇は、互いに<b>共役な複素数</b>のペアです！
+    </div>
+
+  </div>
+
+  <script>
+    // 周期データ定義（基本等式も含める）
+    const periodData = {
+      3: {
+        name: '3周期 (ω オメガ)',
+        symbolName: '\\omega',
+        symbols: ['1', '\\omega', '\\omega^2'],
+        values: ['1', '\\frac{-1+\\sqrt{3}i}{2}', '\\frac{-1-\\sqrt{3}i}{2}'],
+        pairs: [0, 1, 1],
+        identities: ['\\omega^3 = 1', '1 + \\omega + \\omega^2 = 0']
+      },
+      4: {
+        name: '4周期 (i 虚数単位)',
+        symbolName: 'i',
+        symbols: ['1', 'i', 'i^2', 'i^3'],
+        values: ['1', 'i', '-1', '-i'],
+        pairs: [0, 1, 0, 1],
+        identities: ['i^4 = 1 \\quad (i^2 = -1)', '1 + i + i^2 + i^3 = 0']
+      },
+      5: {
+        name: '5周期 (ζ ゼータ)',
+        symbolName: '\\zeta',
+        symbols: ['1', '\\zeta', '\\zeta^2', '\\zeta^3', '\\zeta^4'],
+        values: [
+          '1',
+          '\\frac{\\sqrt{5}-1+\\sqrt{10+2\\sqrt{5}}i}{4}',
+          '\\frac{-\\sqrt{5}-1+\\sqrt{10-2\\sqrt{5}}i}{4}',
+          '\\frac{-\\sqrt{5}-1-\\sqrt{10-2\\sqrt{5}}i}{4}',
+          '\\frac{\\sqrt{5}-1-\\sqrt{10+2\\sqrt{5}}i}{4}'
+        ],
+        pairs: [0, 1, 2, 2, 1],
+        identities: ['\\zeta^5 = 1', '1 + \\zeta + \\zeta^2 + \\zeta^3 + \\zeta^4 = 0']
+      },
+      6: {
+        name: '6周期 (η エータ)',
+        symbolName: '\\eta',
+        symbols: ['1', '\\eta', '\\eta^2', '\\eta^3', '\\eta^4', '\\eta^5'],
+        values: ['1', '\\frac{1+\\sqrt{3}i}{2}', '\\frac{-1+\\sqrt{3}i}{2}', '-1', '\\frac{-1-\\sqrt{3}i}{2}', '\\frac{1-\\sqrt{3}i}{2}'],
+        pairs: [0, 1, 2, 0, 2, 1],
+        identities: ['\\eta^6 = 1 \\quad (\\eta^3 = -1)', '1 + \\eta + \\eta^2 + \\eta^3 + \\eta^4 + \\eta^5 = 0']
+      },
+      7: {
+        name: '7周期 (θ シータ)',
+        symbolName: '\\theta',
+        symbols: ['1', '\\theta', '\\theta^2', '\\theta^3', '\\theta^4', '\\theta^5', '\\theta^6'],
+        values: [
+          '1',
+          '\\cos\\frac{2\\pi}{7} + i\\sin\\frac{2\\pi}{7}',
+          '\\cos\\frac{4\\pi}{7} + i\\sin\\frac{4\\pi}{7}',
+          '\\cos\\frac{6\\pi}{7} + i\\sin\\frac{6\\pi}{7}',
+          '\\cos\\frac{6\\pi}{7} - i\\sin\\frac{6\\pi}{7}',
+          '\\cos\\frac{4\\pi}{7} - i\\sin\\frac{4\\pi}{7}',
+          '\\cos\\frac{2\\pi}{7} - i\\sin\\frac{2\\pi}{7}'
+        ],
+        pairs: [0, 1, 2, 3, 3, 2, 1],
+        identities: ['\\theta^7 = 1', '1 + \\theta + \\theta^2 + \\theta^3 + \\theta^4 + \\theta^5 + \\theta^6 = 0']
+      },
+      8: {
+        name: '8周期 (φ ファイ)',
+        symbolName: '\\phi',
+        symbols: ['1', '\\phi', '\\phi^2', '\\phi^3', '\\phi^4', '\\phi^5', '\\phi^6', '\\phi^7'],
+        values: ['1', '\\frac{1+i}{\\sqrt{2}}', 'i', '\\frac{-1+i}{\\sqrt{2}}', '-1', '\\frac{-1-i}{\\sqrt{2}}', '-i', '\\frac{1-i}{\\sqrt{2}}'],
+        pairs: [0, 1, 2, 3, 0, 3, 2, 1],
+        identities: ['\\phi^8 = 1 \\quad (\\phi^4 = -1)', '1 + \\phi + \\phi^2 + \\phi^3 + \\phi^4 + \\phi^5 + \\phi^6 + \\phi^7 = 0']
+      }
+    };
+
+    let currentPeriod = 4;
+    let currentStep = 0;
+    let displayMode = 'symbol'; // 'symbol' or 'value'
+    let currentAngle = 0;
+
+    const wheelEl = document.getElementById('wheel');
+
+    // 初期化
+    function init() {
+      renderWheel();
+      updateStatus();
+      updateIdentities();
+    }
+
+    // モード切替（標準記号 vs 複素数解）
+    function setDisplayMode(mode) {
+      displayMode = mode;
+      document.getElementById('tabSymbol').classList.toggle('active', mode === 'symbol');
+      document.getElementById('tabValue').classList.toggle('active', mode === 'value');
+      renderNodesText();
+      updateStatus();
+    }
+
+    // 周期変更
+    function changePeriod() {
+      currentPeriod = parseInt(document.getElementById('periodSelect').value);
+      currentStep = 0;
+      currentAngle = 0;
+      wheelEl.style.transform = `rotate(0deg)`;
+      renderWheel();
+      updateStatus();
+      updateIdentities();
+    }
+
+    // ホイールの描画（上部を1にし、時計回りに1乗, 2乗...）
+    function renderWheel() {
+      wheelEl.innerHTML = '';
+      const data = periodData[currentPeriod];
+      const n = currentPeriod;
+      const radius = 100; // ホイールの中心からの距離(px)
+
+      for (let i = 0; i < n; i++) {
+        const angleDeg = -90 + (360 / n) * i;
+        const angleRad = (angleDeg * Math.PI) / 180;
+
+        const x = 130 + radius * Math.cos(angleRad);
+        const y = 130 + radius * Math.sin(angleRad);
+
+        const node = document.createElement('div');
+        node.className = `node ${getPairClass(data.pairs[i])}`;
+        node.style.left = `${x}px`;
+        node.style.top = `${y}px`;
+
+        const content = document.createElement('div');
+        content.className = 'node-content';
+        content.id = `node-content-${i}`;
+        
+        node.appendChild(content);
+        wheelEl.appendChild(node);
+      }
+      renderNodesText();
+    }
+
+    // 共役ペア用クラス選択
+    function getPairClass(pairId) {
+      if (pairId === 0) return 'pair-real';
+      if (pairId === 1) return 'pair-1';
+      if (pairId === 2) return 'pair-2';
+      if (pairId === 3) return 'pair-3';
+      return '';
+    }
+
+    // ノード内の数式テキストを更新
+    function renderNodesText() {
+      const data = periodData[currentPeriod];
+      for (let i = 0; i < currentPeriod; i++) {
+        const contentEl = document.getElementById(`node-content-${i}`);
+        if (!contentEl) continue;
+        
+        const latexText = displayMode === 'symbol' ? data.symbols[i] : data.values[i];
+        contentEl.innerHTML = '';
+        katex.render(latexText, contentEl, { throwOnError: false });
+        
+        contentEl.style.transform = `rotate(${-currentAngle}deg)`;
+      }
+    }
+
+    // 1回分回転（時計回り）
+    function spinNext() {
+      currentStep++;
+      const stepAngle = 360 / currentPeriod;
+      currentAngle -= stepAngle;
+      
+      wheelEl.style.transform = `rotate(${currentAngle}deg)`;
+
+      for (let i = 0; i < currentPeriod; i++) {
+        const contentEl = document.getElementById(`node-content-${i}`);
+        if (contentEl) {
+          contentEl.style.transform = `rotate(${-currentAngle}deg)`;
+        }
+      }
+
+      updateStatus();
+    }
+
+    // リセット
+    function resetSpin() {
+      currentStep = 0;
+      currentAngle = 0;
+      wheelEl.style.transform = `rotate(0deg)`;
+      for (let i = 0; i < currentPeriod; i++) {
+        const contentEl = document.getElementById(`node-content-${i}`);
+        if (contentEl) {
+          contentEl.style.transform = `rotate(0deg)`;
+        }
+      }
+      updateStatus();
+    }
+
+    // 上部の現在地ステータス表示を更新
+    function updateStatus() {
+      const data = periodData[currentPeriod];
+      const index = currentStep % currentPeriod;
+      
+      document.getElementById('statusStepTitle').innerText = `掛け算 ${currentStep} 回目の到達値 (あまり ${index})`;
+
+      const statusEl = document.getElementById('statusMath');
+      statusEl.innerHTML = '';
+
+      let mathExpr = '';
+      if (displayMode === 'symbol') {
+        const sym = data.symbolName;
+        mathExpr = `${sym}^{${currentStep}} = ${data.symbols[index]}`;
+        if (data.symbols[index] !== data.values[index]) {
+          mathExpr += ` = ${data.values[index]}`;
+        }
+      } else {
+        mathExpr = data.values[index];
+      }
+
+      katex.render(mathExpr, statusEl, { throwOnError: false });
+    }
+
+    // 下部の基本等式情報を更新
+    function updateIdentities() {
+      const data = periodData[currentPeriod];
+      const container = document.getElementById('identityMath');
+      container.innerHTML = '';
+
+      data.identities.forEach(eq => {
+        const div = document.createElement('div');
+        katex.render(eq, div, { throwOnError: false });
+        container.appendChild(div);
+      });
+    }
+
+    // ページ読込時に実行
+    window.onload = init;
+  </script>
+</body>
+</html>
