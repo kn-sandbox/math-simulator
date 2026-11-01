@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>素数スピードランナー</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;700&family=Inter:wght@400;600;800;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap');
+        
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background: #f8fafc;
+            color: #0f172a;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .font-math { font-family: 'Fira Code', monospace; }
+
+        /* Minimal White UI Card */
+        .arcade-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .btn-prime {
+            transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn-prime:active {
+            transform: scale(0.94);
+            background-color: #0f172a !important;
+            color: #ffffff !important;
+        }
+
+        /* Minimal Numeric Countdown Style */
+        .simple-countdown-num {
+            font-size: 8rem;
+            font-weight: 900;
+            line-height: 1;
+            color: #0f172a;
+        }
+
+        /* Praise Popup Banner Animation */
+        @keyframes praiseFloat {
+            0% { opacity: 0; transform: translate(-50%, -10px) scale(0.8); }
+            20% { opacity: 1; transform: translate(-50%, -30px) scale(1.1); }
+            80% { opacity: 1; transform: translate(-50%, -35px) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50px) scale(0.9); }
+        }
+        .praise-banner {
+            position: absolute;
+            left: 50%;
+            top: 20%;
+            transform: translateX(-50%);
+            animation: praiseFloat 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* Animations */
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.85); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .animate-pop { animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            75% { transform: translateX(6px); }
+        }
+        .animate-shake { animation: shake 0.25s ease-in-out; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen justify-between select-none relative bg-slate-50 text-slate-900">
+
+    <!-- Particle Overlay Canvas -->
+    <canvas id="effectsCanvas" class="fixed inset-0 pointer-events-none z-40 w-full h-full"></canvas>
+
+    <!-- SIMPLE COUNTDOWN OVERLAY -->
+    <div id="countdownModal" class="hidden fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/20 backdrop-blur-md">
+        <div class="relative flex flex-col items-center gap-4 text-center">
+            <span class="text-xs font-extrabold uppercase tracking-widest text-slate-500">READY</span>
+            <div id="countdownNum" class="simple-countdown-num font-math animate-pop">
+                5
+            </div>
+            <div id="countdownSub" class="text-xs font-bold text-slate-700 tracking-wider">
+                GET READY...
+            </div>
+        </div>
+    </div>
+
+    <!-- Header Navigation -->
+    <header class="w-full bg-white/80 backdrop-blur-md sticky top-0 z-30 border-b border-slate-200 px-4 py-3">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-2.5 cursor-pointer" onclick="switchView('menu')">
+                <div class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white font-black text-sm">
+                    <i class="fa-solid fa-divide"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-black tracking-tight text-slate-900">
+                        PRIME SPEEDRUNNER
+                    </h1>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-1.5">
+                <button onclick="openTitlesModal()" class="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 flex items-center gap-1.5 transition text-xs font-bold" title="称号一覧">
+                    <i class="fa-solid fa-trophy text-amber-500"></i>
+                    <span id="headerPlayerTitle" class="truncate max-w-[90px] sm:max-w-none">素数ビギナー</span>
+                </button>
+                <button onclick="toggleBGM()" id="bgmBtn" class="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 flex items-center justify-center transition" title="BGM ON/OFF">
+                    <i class="fa-solid fa-music text-xs"></i>
+                </button>
+                <button onclick="toggleAudio()" id="audioBtn" class="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 flex items-center justify-center transition" title="SE ON/OFF">
+                    <i class="fa-solid fa-volume-high text-xs"></i>
+                </button>
+                <button onclick="openTipsModal()" class="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 flex items-center justify-center transition" title="高校数学裏ワザ">
+                    <i class="fa-solid fa-lightbulb text-xs"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="max-w-3xl w-full mx-auto p-4 flex-grow flex flex-col justify-center items-center z-10">
+
+        <!-- ================= 1. MENU VIEW ================= -->
+        <section id="menuView" class="w-full space-y-6 my-auto py-4">
+            <div class="text-center space-y-2">
+                <span class="px-3 py-1 text-[11px] font-semibold rounded-full bg-slate-200/70 text-slate-700 tracking-wide">
+                    素因数分解タイムアタック
+                </span>
+                <h2 class="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+                    Prime Factorization
+                </h2>
+                <p class="text-slate-500 text-xs sm:text-sm max-w-md mx-auto">
+                    楽しく素早く正確に素因数分解せよ。
+                </p>
+            </div>
+
+            <!-- Mode Selection Cards Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
+                
+                <!-- 60s Normal Mode -->
+                <div onclick="startGame('speed60')" class="arcade-card p-5 rounded-2xl cursor-pointer hover:border-slate-400 transition-all group flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">STANDARD</span>
+                            <span class="text-[11px] font-math text-slate-400">BEST: <span id="best60" class="text-slate-900 font-bold">0</span></span>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-900 group-hover:text-blue-600 transition flex items-center gap-1.5">
+                            <i class="fa-regular fa-clock"></i> 60秒TA
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                            標準レベル。スピード感を楽しみながらウォームアップ！
+                        </p>
+                    </div>
+                    <div class="mt-4 pt-2.5 border-t border-slate-100 flex justify-between items-center text-xs text-slate-900 font-bold">
+                        <span>START</span>
+                        <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition"></i>
+                    </div>
+                </div>
+
+                <!-- 120s Hard Mode -->
+                <div onclick="startGame('speed120')" class="arcade-card p-5 rounded-2xl cursor-pointer hover:border-slate-400 transition-all group flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-white">HARD</span>
+                            <span class="text-[11px] font-math text-slate-400">BEST: <span id="best120" class="text-slate-900 font-bold">0</span></span>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-900 group-hover:text-blue-600 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-fire text-slate-700"></i> 120秒TA【難】
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                            500以上の数が登場。ハードモード！
+                        </p>
+                    </div>
+                    <div class="mt-4 pt-2.5 border-t border-slate-100 flex justify-between items-center text-xs text-slate-900 font-bold">
+                        <span>START HARD</span>
+                        <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition"></i>
+                    </div>
+                </div>
+
+                <!-- Endless Endless Mode -->
+                <div onclick="startGame('endless')" class="arcade-card p-5 rounded-2xl cursor-pointer hover:border-slate-400 transition-all group flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">ENDLESS</span>
+                            <span class="text-[11px] font-math text-slate-400">BEST: <span id="bestEndless" class="text-slate-900 font-bold">0</span>問</span>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-900 group-hover:text-emerald-600 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-infinity text-emerald-600"></i> とことんモード
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                            時間制限なし！とことんといっておきながら、1回でも誤答すると即終了。
+                        </p>
+                    </div>
+                    <div class="mt-4 pt-2.5 border-t border-slate-100 flex justify-between items-center text-xs text-slate-900 font-bold">
+                        <span>START ENDLESS</span>
+                        <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Summary Bar -->
+            <div onclick="openTitlesModal()" class="arcade-card p-4 rounded-xl max-w-xl mx-auto flex items-center justify-between text-xs cursor-pointer hover:border-slate-400 transition group">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-amber-500 font-bold group-hover:bg-amber-50 group-hover:border-amber-200 transition">
+                        <i class="fa-solid fa-trophy text-sm"></i>
+                    </div>
+                    <div>
+                        <div class="text-slate-500 flex items-center gap-1">
+                            称号: <span id="playerTitle" class="font-bold text-slate-900 underline underline-offset-2">素数ビギナー</span>
+                            <i class="fa-solid fa-chevron-right text-[10px] text-slate-400 group-hover:translate-x-0.5 transition"></i>
+                        </div>
+                        <div class="text-[11px] text-slate-400">累計分解数: <span id="totalSolved" class="font-math font-bold text-slate-700">0</span> 問</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span class="text-slate-400 block text-[10px]">最高FPM (分解/分)</span>
+                    <span id="maxFpm" class="font-math font-bold text-slate-900 text-base">0.0</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 2. GAMEPLAY VIEW ================= -->
+        <section id="gameView" class="hidden w-full max-w-md space-y-3">
+            
+            <!-- Top Dashboard Bar -->
+            <div class="arcade-card p-3 rounded-xl flex justify-between items-center text-xs">
+                <!-- Exit -->
+                <button onclick="confirmExitGame()" class="text-slate-400 hover:text-slate-700 px-2 py-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+
+                <!-- Timer & Mode -->
+                <div class="flex items-center gap-2">
+                    <i id="timerIcon" class="fa-regular fa-clock text-slate-500 text-base"></i>
+                    <span id="gameTimer" class="font-math font-bold text-2xl text-slate-900">60.0</span>
+                    <span id="timerUnit" class="text-[10px] text-slate-400">sec</span>
+                </div>
+
+                <!-- Score & Realtime Style Rank -->
+                <div class="text-right">
+                    <div class="flex items-center gap-1.5 justify-end">
+                        <span id="styleRankBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">RANK C</span>
+                        <span id="gameScore" class="font-math font-bold text-lg text-slate-900">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Combo & Boost Indicator -->
+            <div class="flex justify-between items-center px-1 min-h-[24px]">
+                <div id="boostBadge" class="hidden px-2 py-0.5 rounded-full bg-slate-900 text-white font-bold text-[10px]">
+                    BOOST ×2
+                </div>
+                <div id="comboContainer" class="opacity-0 transition-opacity flex items-center gap-1 text-[11px] bg-slate-100 text-slate-800 font-bold px-2.5 py-0.5 rounded-full border border-slate-200">
+                    <i class="fa-solid fa-bolt text-slate-600"></i>
+                    <span id="comboText">2 COMBO!</span>
+                </div>
+            </div>
+
+            <!-- Main Question & Factorization Card -->
+            <div id="questionCard" class="arcade-card p-6 rounded-2xl text-center space-y-4 relative overflow-hidden transition-all">
+                
+                <!-- Dynamic Praise Popup Container -->
+                <div id="praiseContainer" class="pointer-events-none"></div>
+
+                <!-- Active Skill Perks Bar -->
+                <div class="flex justify-between items-center text-xs border-b border-slate-100 pb-2">
+                    <span id="targetTag" class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">TARGET</span>
+                    <div class="flex gap-1.5">
+                        <button onclick="useSkill('freeze')" id="skillFreeze" class="px-2 py-1 rounded bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 text-[10px] transition disabled:opacity-40">
+                            ⏱️ 停止 <span id="cdFreeze" class="font-math">(READY)</span>
+                        </button>
+                        <button onclick="useSkill('analyze')" id="skillAnalyze" class="px-2 py-1 rounded bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 text-[10px] transition disabled:opacity-40">
+                            💡 解析 <span id="cdAnalyze" class="font-math">(READY)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Number Display -->
+                <div>
+                    <div id="targetNumber" class="text-5xl sm:text-6xl font-black font-math text-slate-900 tracking-tight">
+                        360
+                    </div>
+                </div>
+
+                <!-- Step Visualization Container -->
+                <div id="factorSteps" class="min-h-[40px] bg-slate-50 rounded-xl p-2 flex flex-wrap items-center justify-center gap-1.5 text-xs font-math border border-slate-200">
+                    <!-- e.g. 360 -> ÷2 -> 180 ... -->
+                </div>
+
+                <!-- Current Formula Preview -->
+                <div id="formulaPreview" class="h-6 font-math text-sm font-bold text-slate-600">
+                    <!-- e.g. 2³ × 3² × 5 -->
+                </div>
+            </div>
+
+            <!-- PRIME KEYPAD -->
+            <div id="keypadSection" class="space-y-2">
+                <div class="flex justify-between items-center px-1 text-[11px]">
+                    <span class="text-slate-500 font-medium">素因数を選択：</span>
+                    <button onclick="undoStep()" id="undoBtn" class="text-slate-400 hover:text-slate-800 disabled:opacity-30 transition" disabled>
+                        <i class="fa-solid fa-rotate-left"></i> 戻す
+                    </button>
+                </div>
+
+                <!-- Minimal White Keypad Buttons -->
+                <div class="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                    <button onclick="pressPrime(2)" class="btn-prime arcade-card py-3 rounded-xl font-math font-bold text-xl text-slate-900 hover:bg-slate-100">2</button>
+                    <button onclick="pressPrime(3)" class="btn-prime arcade-card py-3 rounded-xl font-math font-bold text-xl text-slate-900 hover:bg-slate-100">3</button>
+                    <button onclick="pressPrime(5)" class="btn-prime arcade-card py-3 rounded-xl font-math font-bold text-xl text-slate-900 hover:bg-slate-100">5</button>
+                    <button onclick="pressPrime(7)" class="btn-prime arcade-card py-3 rounded-xl font-math font-bold text-xl text-slate-900 hover:bg-slate-100">7</button>
+
+                    <button onclick="pressPrime(11)" class="btn-prime arcade-card py-3 rounded-xl font-math font-bold text-xl text-slate-900 hover:bg-slate-100">11</button>
+                    <button onclick="pressPrime(13)" class="btn-prime arcade-card py-3 rounded-xl font-math font-bold text-xl text-slate-900 hover:bg-slate-100">13</button>
+                    <button onclick="pressPrime(17)" class="btn-prime arcade-card py-3 rounded-xl font-math font-bold text-xl text-slate-900 hover:bg-slate-100">17</button>
+                    <button onclick="pressPrime(19)" class="btn-prime arcade-card py-3 rounded-xl font-math font-bold text-xl text-slate-900 hover:bg-slate-100">19</button>
+
+                    <button onclick="pressPrime(23)" class="btn-prime arcade-card py-3 rounded-xl font-math font-bold text-xl text-slate-900 hover:bg-slate-100">23</button>
+                    <button onclick="pressPrime(29)" class="btn-prime arcade-card py-3 rounded-xl font-math font-bold text-xl text-slate-900 hover:bg-slate-100">29</button>
+                    <button onclick="pressPrime(31)" class="btn-prime arcade-card py-3 rounded-xl font-math font-bold text-xl text-slate-900 hover:bg-slate-100">31</button>
+                    <button onclick="pressPrime(37)" class="btn-prime arcade-card py-3 rounded-xl font-math font-bold text-xl text-slate-900 hover:bg-slate-100">37</button>
+                </div>
+
+                <!-- Self Prime Declaration -->
+                <button onclick="declareSelfPrime()" class="w-full btn-prime arcade-card py-3 rounded-xl font-bold text-xs text-slate-900 border-slate-300 hover:bg-slate-100 flex items-center justify-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-check"></i>
+                    <span>残った数は素数である</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- ================= 3. RESULT VIEW ================= -->
+        <section id="resultView" class="hidden w-full max-w-sm arcade-card p-6 rounded-2xl text-center space-y-4 animate-pop my-auto">
+            <div id="resultRankBadge" class="w-20 h-20 rounded-2xl mx-auto flex items-center justify-center text-3xl font-black font-math shadow-sm border border-slate-200 bg-slate-50 text-slate-900">
+                S+
+            </div>
+
+            <div>
+                <h3 id="resultTitle" class="text-xl font-black text-slate-900">RUN COMPLETE</h3>
+                <p id="resultSubtitle" class="text-xs text-slate-400 mt-0.5">スコア結果</p>
+            </div>
+
+            <!-- Stats Card -->
+            <div class="bg-slate-50 rounded-xl p-3.5 text-xs space-y-2 border border-slate-200 font-math text-slate-700">
+                <div class="flex justify-between items-center">
+                    <span class="font-sans text-slate-500">分解達成数:</span>
+                    <span id="resSolved" class="font-bold text-slate-900">0 問</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="font-sans text-slate-500">最大コンボ:</span>
+                    <span id="resMaxCombo" class="font-bold text-slate-900">0 COMBO</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="font-sans text-slate-500">分解速度 (FPM):</span>
+                    <span id="resFpm" class="font-bold text-slate-900">0.0 / min</span>
+                </div>
+                <div class="flex justify-between items-center pt-2 border-t border-slate-200 font-sans font-bold text-base text-slate-900">
+                    <span>FINAL SCORE:</span>
+                    <span id="resFinalScore" class="font-math text-xl text-slate-900">0 Pts</span>
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <button onclick="switchView('menu')" class="w-1/2 py-2.5 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 hover:bg-slate-50 transition">
+                    メニュー
+                </button>
+                <button onclick="restartCurrentGame()" class="w-1/2 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 font-bold text-xs text-white shadow-md transition">
+                    RETRY
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MATH TIPS MODAL -->
+    <div id="tipsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+        <div class="arcade-card w-full max-w-md rounded-2xl p-5 space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                <h3 class="font-bold text-sm flex items-center gap-2 text-slate-900">
+                    <i class="fa-solid fa-lightbulb text-slate-700"></i>
+                    高校数学：倍数判定＆素数見抜きテクニック
+                </h3>
+                <button onclick="closeTipsModal()" class="text-slate-400 hover:text-slate-700">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-2.5 text-xs max-h-[60vh] overflow-y-auto pr-1">
+                <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                    <span class="font-bold text-slate-900 font-math">【 91 = 7 × 13 】 【 221 = 13 × 17 】</span>
+                    <p class="text-slate-600 mt-0.5">「一見素数に見える合成数」。暗記推奨！</p>
+                </div>
+
+                <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                    <span class="font-bold text-slate-900 font-math">【 3 や 9 の倍数判定 】</span>
+                    <p class="text-slate-600 mt-0.5">各位の数字の和が 3（または9）の倍数であれば元の数も倍数。<br><span class="text-slate-400">例: 351 ➔ 3+5+1 = 9 (9の倍数)</span></p>
+                </div>
+
+                <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                    <span class="font-bold text-slate-900 font-math">【 11 の倍数判定 】</span>
+                    <p class="text-slate-600 mt-0.5">奇数位の和と偶数位の和の差が 0 または 11の倍数。<br><span class="text-slate-400">例: 253 ➔ (2+3)-5 = 0 ➔ 11の倍数</span></p>
+                </div>
+            </div>
+
+            <button onclick="closeTipsModal()" class="w-full py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs">閉じる</button>
+        </div>
+    </div>
+
+    <!-- TITLES / ACHIEVEMENTS MODAL -->
+    <div id="titlesModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+        <div class="arcade-card w-full max-w-md rounded-2xl p-5 space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                <div>
+                    <h3 class="font-bold text-sm flex items-center gap-2 text-slate-900">
+                        <i class="fa-solid fa-trophy text-amber-500"></i>
+                        称号・実績コレクション
+                    </h3>
+                    <p class="text-[11px] text-slate-400">条件を達成して称号をアンロックしよう！</p>
+                </div>
+                <button onclick="closeTitlesModal()" class="text-slate-400 hover:text-slate-700">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- List Container -->
+            <div id="titlesList" class="space-y-2 text-xs max-h-[60vh] overflow-y-auto pr-1">
+                <!-- Dynamically generated in JS -->
+            </div>
+
+            <button onclick="closeTitlesModal()" class="w-full py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs">閉じる</button>
+        </div>
+    </div>
+
+    <!-- SCRIPT LOGIC -->
+    <script>
+        /* ==========================================================================
+           1. CANVAS PARTICLE SYSTEM
+           ========================================================================== */
+        const canvas = document.getElementById('effectsCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 5;
+                this.vy = (Math.random() - 0.5) * 5;
+                this.radius = Math.random() * 2.5 + 1;
+                this.color = color;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.03 + 0.02;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function createBurst(x, y, color = '#0f172a', count = 15) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles = particles.filter(p => p.alpha > 0);
+            particles.forEach(p => { p.update(); p.draw(); });
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        /* ==========================================================================
+           2. SOUND SYNTHESIZER
+           ========================================================================== */
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.seEnabled = true;
+                this.bgmEnabled = false;
+                this.bgmTimer = null;
+                this.bgmStep = 0;
+            }
+
+            initCtx() {
+                if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            playTone(freq, type = 'sine', duration = 0.1, vol = 0.08) {
+                if (!this.seEnabled) return;
+                this.initCtx();
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            }
+
+            playStep() {
+                this.playTone(587.33, 'sine', 0.08, 0.08);
+                setTimeout(() => this.playTone(880, 'sine', 0.1, 0.08), 50);
+            }
+            playCorrect() {
+                this.playTone(523.25, 'sine', 0.08, 0.08);
+                setTimeout(() => this.playTone(659.25, 'sine', 0.08, 0.08), 50);
+                setTimeout(() => this.playTone(783.99, 'sine', 0.12, 0.1), 100);
+            }
+            playWrong() { 
+                this.playTone(180, 'sawtooth', 0.15, 0.08); 
+            }
+            playCountdownTick() {
+                this.playTone(600, 'sine', 0.08, 0.12);
+            }
+            playCountdownGo() {
+                this.playTone(900, 'sine', 0.18, 0.15);
+                setTimeout(() => this.playTone(1200, 'sine', 0.2, 0.15), 60);
+            }
+            playVictory() {
+                this.playTone(523.25, 'triangle', 0.1, 0.1);
+                setTimeout(() => this.playTone(659.25, 'triangle', 0.1, 0.1), 80);
+                setTimeout(() => this.playTone(783.99, 'triangle', 0.1, 0.1), 160);
+                setTimeout(() => this.playTone(1046.50, 'triangle', 0.25, 0.12), 240);
+            }
+
+            toggleBGM() {
+                this.bgmEnabled = !this.bgmEnabled;
+                const btn = document.getElementById('bgmBtn');
+                if (this.bgmEnabled) {
+                    this.initCtx();
+                    btn.classList.add('bg-slate-900', 'text-white');
+                    this.startBGM();
+                } else {
+                    btn.classList.remove('bg-slate-900', 'text-white');
+                    this.stopBGM();
+                }
+            }
+
+            startBGM() {
+                if (this.bgmTimer) clearInterval(this.bgmTimer);
+                const notes = [261.63, 293.66, 329.63, 349.23];
+                this.bgmStep = 0;
+                this.bgmTimer = setInterval(() => {
+                    if (!this.bgmEnabled) return;
+                    this.playTone(notes[this.bgmStep % notes.length], 'sine', 0.12, 0.015);
+                    this.bgmStep++;
+                }, 300);
+            }
+            stopBGM() {
+                if (this.bgmTimer) clearInterval(this.bgmTimer);
+                this.bgmTimer = null;
+            }
+        }
+
+        const sound = new SoundEngine();
+        function toggleAudio() {
+            sound.seEnabled = !sound.seEnabled;
+            document.getElementById('audioBtn').innerHTML = sound.seEnabled ? 
+                '<i class="fa-solid fa-volume-high text-xs"></i>' : 
+                '<i class="fa-solid fa-volume-xmark text-xs text-slate-400"></i>';
+        }
+        function toggleBGM() { sound.toggleBGM(); }
+
+        /* ==========================================================================
+           3. MATH MATH HELPERS
+           ========================================================================== */
+        function isPrime(n) {
+            if (n <= 1) return false;
+            if (n <= 3) return true;
+            if (n % 2 === 0 || n % 3 === 0) return false;
+            for (let i = 5; i * i <= n; i += 6) {
+                if (n % i === 0 || n % (i + 2) === 0) return false;
+            }
+            return true;
+        }
+
+        function getPrimeFactors(n) {
+            const factors = [];
+            let temp = n;
+            let d = 2;
+            while (temp >= 2) {
+                if (temp % d === 0) {
+                    factors.push(d);
+                    temp /= d;
+                } else {
+                    d++;
+                    if (d * d > temp) {
+                        if (temp > 1) factors.push(temp);
+                        break;
+                    }
+                }
+            }
+            return factors;
+        }
+
+        function countDivisors(factors) {
+            const counts = {};
+            factors.forEach(f => counts[f] = (counts[f] || 0) + 1);
+            let total = 1;
+            Object.values(counts).forEach(exp => total *= (exp + 1));
+            return total;
+        }
+
+        function formatFactors(factors) {
+            if (factors.length === 0) return '';
+            const counts = {};
+            factors.forEach(f => counts[f] = (counts[f] || 0) + 1);
+            const sups = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+            const toSup = num => String(num).split('').map(c => sups[c] || c).join('');
+            return Object.entries(counts).map(([p, c]) => c > 1 ? `${p}${toSup(c)}` : `${p}`).join(' × ');
+        }
+
+        /* ==========================================================================
+           4. GAME STATE & CORE LOGIC
+           ========================================================================== */
+        let game = {
+            mode: 'speed60',
+            duration: 60,
+            timeLeft: 60.0,
+            timerId: null,
+
+            score: 0,
+            combo: 0,
+            maxCombo: 0,
+            solvedCount: 0,
+            missCount: 0,
+            isFrozen: false,
+
+            skills: { freeze: true, analyze: true },
+
+            currentOriginal: 0,
+            currentVal: 0,
+            userFactors: [],
+            targetFactors: [],
+
+            best60: parseInt(localStorage.getItem('psr_best60') || '0'),
+            best120: parseInt(localStorage.getItem('psr_best120') || '0'),
+            bestEndless: parseInt(localStorage.getItem('psr_best_endless') || '0'),
+            totalSolved: parseInt(localStorage.getItem('psr_total_solved') || '0'),
+            maxFpm: parseFloat(localStorage.getItem('psr_max_fpm') || '0.0'),
+            maxComboEver: parseInt(localStorage.getItem('psr_max_combo') || '0'),
+            heavySolved: parseInt(localStorage.getItem('psr_heavy_solved') || '0'),
+            primeDeclarations: parseInt(localStorage.getItem('psr_prime_decl') || '0'),
+            noMissRuns: parseInt(localStorage.getItem('psr_nomiss_runs') || '0'),
+            skillUsedCount: parseInt(localStorage.getItem('psr_skill_used') || '0'),
+            bigPrimeSolved: parseInt(localStorage.getItem('psr_big_prime') || '0')
+        };
+
+        /* Extended 30 Achievements Definition */
+        const ACHIEVEMENTS = [
+            // 解放・分解数系
+            { id: 'sol_1', name: '素数ビギナー', desc: '累計で 1 問以上分解する', req: (g) => g.totalSolved >= 1, progress: (g) => `${Math.min(g.totalSolved, 1)}/1` },
+            { id: 'sol_10', name: '素数挑戦者', desc: '累計で 10 問以上分解する', req: (g) => g.totalSolved >= 10, progress: (g) => `${Math.min(g.totalSolved, 10)}/10` },
+            { id: 'sol_30', name: '計算パートナー', desc: '累計で 30 問以上分解する', req: (g) => g.totalSolved >= 30, progress: (g) => `${Math.min(g.totalSolved, 30)}/30` },
+            { id: 'sol_77', name: '素因数フロンティア', desc: '累計で 77 問以上分解する', req: (g) => g.totalSolved >= 77, progress: (g) => `${Math.min(g.totalSolved, 77)}/77` },
+            { id: 'sol_150', name: '素数分解マスター', desc: '累計で 150 問以上分解する', req: (g) => g.totalSolved >= 150, progress: (g) => `${Math.min(g.totalSolved, 150)}/150` },
+            { id: 'sol_300', name: '素論プロフェッショナル', desc: '累計で 300 問以上分解する', req: (g) => g.totalSolved >= 300, progress: (g) => `${Math.min(g.totalSolved, 300)}/300` },
+            { id: 'sol_500', name: '素論無双', desc: '累計で 500 問以上分解する', req: (g) => g.totalSolved >= 500, progress: (g) => `${Math.min(g.totalSolved, 500)}/500` },
+            { id: 'sol_1000', name: '素数神', desc: '累計で 1000 問以上分解する', req: (g) => g.totalSolved >= 1000, progress: (g) => `${Math.min(g.totalSolved, 1000)}/1000` },
+
+            // スピード・FPM系
+            { id: 'fpm_6', name: '順調なステップ', desc: '分解速度 6.0 FPM 以上を達成', req: (g) => g.maxFpm >= 6.0, progress: (g) => `${g.maxFpm.toFixed(1)}/6.0` },
+            { id: 'fpm_10', name: '高速計算者', desc: '分解速度 10.0 FPM 以上を達成', req: (g) => g.maxFpm >= 10.0, progress: (g) => `${g.maxFpm.toFixed(1)}/10.0` },
+            { id: 'fpm_14', name: '音速の分解者', desc: '分解速度 14.0 FPM 以上を達成', req: (g) => g.maxFpm >= 14.0, progress: (g) => `${g.maxFpm.toFixed(1)}/14.0` },
+            { id: 'fpm_18', name: '光速の分解者', desc: '分解速度 18.0 FPM 以上を達成（S+）', req: (g) => g.maxFpm >= 18.0, progress: (g) => `${g.maxFpm.toFixed(1)}/18.0` },
+            { id: 'fpm_22', name: '神速の計算機', desc: '分解速度 22.0 FPM 以上を達成', req: (g) => g.maxFpm >= 22.0, progress: (g) => `${g.maxFpm.toFixed(1)}/22.0` },
+
+            // コンボ系
+            { id: 'cmb_3', name: 'コンボビギナー', desc: '3 COMBO 以上を達成する', req: (g) => g.maxComboEver >= 3, progress: (g) => `${Math.min(g.maxComboEver, 3)}/3` },
+            { id: 'cmb_7', name: 'コンボスター', desc: '7 COMBO 以上を達成する', req: (g) => g.maxComboEver >= 7, progress: (g) => `${Math.min(g.maxComboEver, 7)}/7` },
+            { id: 'cmb_12', name: '連鎖の支配者', desc: '12 COMBO 以上を達成する', req: (g) => g.maxComboEver >= 12, progress: (g) => `${Math.min(g.maxComboEver, 12)}/12` },
+            { id: 'cmb_20', name: 'フルコンボエンペラー', desc: '20 COMBO 以上を達成する', req: (g) => g.maxComboEver >= 20, progress: (g) => `${Math.min(g.maxComboEver, 20)}/20` },
+
+            // スコア系
+            { id: 'score_3k', name: 'スコアアチーバー', desc: 'スコア 3,000 Pts 以上を獲得', req: (g) => Math.max(g.best60, g.best120) >= 3000, progress: (g) => `${Math.min(Math.max(g.best60, g.best120), 3000)}/3000` },
+            { id: 'score_7k', name: 'ハイスコアラー', desc: 'スコア 7,000 Pts 以上を獲得', req: (g) => Math.max(g.best60, g.best120) >= 7000, progress: (g) => `${Math.min(Math.max(g.best60, g.best120), 7000)}/7000` },
+            { id: 'score_12k', name: '10,000Ptsマスター', desc: 'スコア 12,000 Pts 以上を獲得', req: (g) => Math.max(g.best60, g.best120) >= 12000, progress: (g) => `${Math.min(Math.max(g.best60, g.best120), 12000)}/12000` },
+            { id: 'score_20k', name: '伝説の素数ランナー', desc: 'スコア 20,000 Pts 以上を獲得', req: (g) => Math.max(g.best60, g.best120) >= 20000, progress: (g) => `${Math.min(Math.max(g.best60, g.best120), 20000)}/20000` },
+
+            // とことんモード＆特殊系
+            { id: 'endless_5', name: 'とことんチャレンジャー', desc: 'とことんモードで 5 問以上連続クリア', req: (g) => g.bestEndless >= 5, progress: (g) => `${Math.min(g.bestEndless, 5)}/5` },
+            { id: 'endless_15', name: 'とことん鉄人', desc: 'とことんモードで 15 問以上連続クリア', req: (g) => g.bestEndless >= 15, progress: (g) => `${Math.min(g.bestEndless, 15)}/15` },
+            { id: 'endless_30', name: 'とことんレジェンド', desc: 'とことんモードで 30 問以上連続クリア', req: (g) => g.bestEndless >= 30, progress: (g) => `${Math.min(g.bestEndless, 30)}/30` },
+            
+            { id: 'heavy_5', name: '大型スレイヤー', desc: '5,000以上の大物Targetを累計 5 問撃破', req: (g) => g.heavySolved >= 5, progress: (g) => `${Math.min(g.heavySolved, 5)}/5` },
+            { id: 'heavy_20', name: '大物ハンター', desc: '5,000以上の大物Targetを累計 20 問撃破', req: (g) => g.heavySolved >= 20, progress: (g) => `${Math.min(g.heavySolved, 20)}/20` },
+            { id: 'prime_decl_5', name: '素数ハンター', desc: '3桁素数を一発で見抜き 5 回正解', req: (g) => g.primeDeclarations >= 5, progress: (g) => `${Math.min(g.primeDeclarations, 5)}/5` },
+            { id: 'prime_decl_15', name: '素数検知アナリスト', desc: '3桁素数を一発で見抜き 15 回正解', req: (g) => g.primeDeclarations >= 15, progress: (g) => `${Math.min(g.primeDeclarations, 15)}/15` },
+            { id: 'nomiss_3', name: 'ノーミスマスター', desc: 'ノーミスで完走（60s/120s）を累計 3 回達成', req: (g) => g.noMissRuns >= 3, progress: (g) => `${Math.min(g.noMissRuns, 3)}/3` },
+            { id: 'skill_10', name: 'タクティシャン', desc: 'アクティブスキルを累計 10 回使用する', req: (g) => g.skillUsedCount >= 10, progress: (g) => `${Math.min(g.skillUsedCount, 10)}/10` }
+        ];
+
+        /* Get player active title based on unlocked achievements */
+        function getActiveTitle() {
+            const unlocked = ACHIEVEMENTS.filter(a => a.req(game));
+            if (unlocked.length === 0) return '素数ビギナー';
+            return unlocked[unlocked.length - 1].name;
+        }
+
+        /* Render titles list modal */
+        function renderTitlesList() {
+            const container = document.getElementById('titlesList');
+            if (!container) return;
+            container.innerHTML = '';
+
+            ACHIEVEMENTS.forEach(ach => {
+                const isUnlocked = ach.req(game);
+                const progText = ach.progress ? ach.progress(game) : '';
+
+                const item = document.createElement('div');
+                item.className = `p-2.5 rounded-xl border flex items-center justify-between text-xs transition ${
+                    isUnlocked 
+                    ? 'bg-amber-50/60 border-amber-200 text-slate-900' 
+                    : 'bg-slate-50 border-slate-200 text-slate-400 opacity-75'
+                }`;
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
+                            isUnlocked ? 'bg-amber-500 text-white shadow-sm' : 'bg-slate-200 text-slate-400'
+                        }">
+                            <i class="fa-solid ${isUnlocked ? 'fa-trophy' : 'fa-lock'}"></i>
+                        </div>
+                        <div>
+                            <div class="font-bold flex items-center gap-1.5 ${isUnlocked ? 'text-slate-900' : 'text-slate-500'}">
+                                ${ach.name}
+                                ${isUnlocked ? '<span class="text-[9px] px-1.5 py-0.2 rounded bg-amber-200 text-amber-900 font-extrabold">獲得!</span>' : ''}
+                            </div>
+                            <div class="text-[10px] ${isUnlocked ? 'text-slate-600' : 'text-slate-400'}">${ach.desc}</div>
+                        </div>
+                    </div>
+                    <div class="text-right font-math text-[10px] font-bold ${isUnlocked ? 'text-amber-700' : 'text-slate-400'}">
+                        ${progText}
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function openTitlesModal() {
+            renderTitlesList();
+            document.getElementById('titlesModal').classList.remove('hidden');
+        }
+
+        function closeTitlesModal() {
+            document.getElementById('titlesModal').classList.add('hidden');
+        }
+
+        function updateMenuStatsUI() {
+            document.getElementById('best60').innerText = `${game.best60.toLocaleString()} Pts`;
+            document.getElementById('best120').innerText = `${game.best120.toLocaleString()} Pts`;
+            document.getElementById('bestEndless').innerText = game.bestEndless.toString();
+            document.getElementById('totalSolved').innerText = game.totalSolved;
+            document.getElementById('maxFpm').innerText = game.maxFpm.toFixed(1);
+
+            const title = getActiveTitle();
+            document.getElementById('playerTitle').innerText = title;
+            document.getElementById('headerPlayerTitle').innerText = title;
+        }
+        updateMenuStatsUI();
+
+        /* Countdown logic before game starts */
+        function startFilmCountdown(onComplete) {
+            const modal = document.getElementById('countdownModal');
+            const numEl = document.getElementById('countdownNum');
+            const subEl = document.getElementById('countdownSub');
+            modal.classList.remove('hidden');
+
+            let count = 5;
+            numEl.innerText = count;
+            subEl.innerText = "GET READY...";
+            sound.playCountdownTick();
+
+            const timer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    numEl.innerText = count;
+                    sound.playCountdownTick();
+                    numEl.classList.remove('animate-pop');
+                    void numEl.offsetWidth;
+                    numEl.classList.add('animate-pop');
+                } else if (count === 0) {
+                    numEl.innerText = "GO!";
+                    subEl.innerText = "START!";
+                    sound.playCountdownGo();
+                } else {
+                    clearInterval(timer);
+                    modal.classList.add('hidden');
+                    if (onComplete) onComplete();
+                }
+            }, 800);
+        }
+
+        /* View switching helper */
+        function switchView(viewName) {
+            document.getElementById('menuView').classList.add('hidden');
+            document.getElementById('gameView').classList.add('hidden');
+            document.getElementById('resultView').classList.add('hidden');
+
+            if (viewName === 'menu') {
+                if (game.timerId) clearInterval(game.timerId);
+                updateMenuStatsUI();
+                document.getElementById('menuView').classList.remove('hidden');
+            } else if (viewName === 'game') {
+                document.getElementById('gameView').classList.remove('hidden');
+            } else if (viewName === 'result') {
+                document.getElementById('resultView').classList.remove('hidden');
+            }
+        }
+
+        function confirmExitGame() {
+            if (confirm('ゲームを一時中断してメニューに戻りますか？')) {
+                if (game.timerId) clearInterval(game.timerId);
+                switchView('menu');
+            }
+        }
+
+        /* Question Helper Generator */
+        function getRandomComposite(min, max, primeList) {
+            for (let i = 0; i < 100; i++) {
+                const count = Math.floor(Math.random() * 2) + 2;
+                let val = 1;
+                for (let j = 0; j < count; j++) {
+                    const p = primeList[Math.floor(Math.random() * primeList.length)];
+                    val *= p;
+                }
+                if (val >= min && val <= max && !isPrime(val)) {
+                    return val;
+                }
+            }
+            return 360;
+        }
+
+        function loadNextQuestion() {
+            game.currentOriginal = generateNumber();
+            game.currentVal = game.currentOriginal;
+            game.userFactors = [];
+            game.targetFactors = getPrimeFactors(game.currentOriginal);
+
+            document.getElementById('targetNumber').innerText = game.currentOriginal;
+            
+            const isHeavy = game.currentOriginal >= 5000 || (game.currentOriginal >= 100 && isPrime(game.currentOriginal));
+            document.getElementById('targetTag').innerText = isHeavy ? "🔥 HEAVY TARGET" : "TARGET";
+            document.getElementById('targetTag').className = isHeavy 
+                ? "text-[10px] text-amber-600 font-extrabold uppercase tracking-wider animate-pulse" 
+                : "text-[10px] text-slate-400 uppercase tracking-wider font-semibold";
+
+            renderStepProgress();
+            updateUndoButton();
+        }
+
+        function renderStepProgress() {
+            const container = document.getElementById('factorSteps');
+            container.innerHTML = '';
+
+            let stepVal = game.currentOriginal;
+            const history = [stepVal];
+
+            game.userFactors.forEach((p) => {
+                stepVal /= p;
+                history.push(stepVal);
+            });
+
+            if (history.length === 1) {
+                container.innerHTML = `<span class="text-slate-400 font-sans text-xs">素数ボタンで割り算を開始</span>`;
+            } else {
+                let html = `<span class="font-bold text-slate-700">${history[0]}</span>`;
+                for (let i = 0; i < game.userFactors.length; i++) {
+                    html += ` <span class="text-slate-400 text-[10px]">÷${game.userFactors[i]} ➔</span> <span class="font-bold text-slate-900">${history[i+1]}</span>`;
+                }
+                container.innerHTML = html;
+            }
+
+            document.getElementById('formulaPreview').innerText = formatFactors(game.userFactors);
+            document.getElementById('targetNumber').innerText = game.currentVal;
+        }
+
+        function handleSuccess() {
+            sound.playCorrect();
+            game.solvedCount++;
+            game.totalSolved++;
+            localStorage.setItem('psr_total_solved', game.totalSolved);
+
+            if (game.currentOriginal >= 5000) {
+                game.heavySolved++;
+                localStorage.setItem('psr_heavy_solved', game.heavySolved);
+                triggerPraise("🔥 BIG FACTOR!", "bg-slate-900 text-white");
+            } else if (game.currentOriginal >= 500) {
+                triggerPraise("✨ NICE FACTOR!", "bg-emerald-600 text-white");
+            }
+
+            game.combo++;
+            if (game.combo > game.maxCombo) game.maxCombo = game.combo;
+            if (game.combo > game.maxComboEver) {
+                game.maxComboEver = game.combo;
+                localStorage.setItem('psr_max_combo', game.maxComboEver);
+            }
+
+            if (game.combo >= 4) {
+                triggerPraise(`${game.combo} COMBO!`, "bg-amber-500 text-white");
+            }
+
+            // Points calculation
+            const basePts = game.currentOriginal > 1000 ? 500 : 200;
+            const comboMult = 1 + (game.combo * 0.2);
+            const addedPts = Math.round(basePts * comboMult);
+            game.score += addedPts;
+            document.getElementById('gameScore').innerText = game.score.toLocaleString();
+
+            updateComboUI();
+            updateStyleRankUI();
+
+            setTimeout(() => {
+                loadNextQuestion();
+            }, 300);
+        }
+
+        function triggerPraise(text, styleClass) {
+            const container = document.getElementById('praiseContainer');
+            const popup = document.createElement('div');
+            popup.className = `praise-banner px-3 py-1 rounded-full text-xs font-black tracking-wider border border-white/20 shadow-lg ${styleClass}`;
+            popup.innerText = text;
+            container.appendChild(popup);
+            setTimeout(() => popup.remove(), 1200);
+        }
+
+        function resetCombo() {
+            game.combo = 0;
+            updateComboUI();
+        }
+
+        function updateComboUI() {
+            const container = document.getElementById('comboContainer');
+            if (game.combo >= 2) {
+                container.classList.remove('opacity-0');
+                document.getElementById('comboText').innerText = `${game.combo} COMBO!`;
+            } else {
+                container.classList.add('opacity-0');
+            }
+        }
+
+        function updateStyleRankUI() {
+            const elapsedTime = (game.duration - game.timeLeft) || 1;
+            const fpm = (game.solvedCount / elapsedTime) * 60;
+            let rank = 'C';
+            if (fpm >= 18) rank = 'S+';
+            else if (fpm >= 14) rank = 'S';
+            else if (fpm >= 10) rank = 'A';
+            else if (fpm >= 6) rank = 'B';
+
+            const badge = document.getElementById('styleRankBadge');
+            badge.innerText = `RANK ${rank}`;
+        }
+
+        function undoStep() {
+            if (game.userFactors.length === 0) return;
+            const last = game.userFactors.pop();
+            game.currentVal *= last;
+            sound.playTone(350, 'sine', 0.08, 0.08);
+            renderStepProgress();
+            updateUndoButton();
+        }
+
+        function updateUndoButton() {
+            const btn = document.getElementById('undoBtn');
+            btn.disabled = game.userFactors.length === 0;
+        }
+
+        function triggerShake() {
+            const card = document.getElementById('questionCard');
+            card.classList.remove('animate-shake');
+            void card.offsetWidth;
+            card.classList.add('animate-shake');
+        }
+
+        function updateSkillUI() {
+            document.getElementById('cdFreeze').innerText = game.skills.freeze ? '(READY)' : '(USED)';
+            document.getElementById('cdAnalyze').innerText = game.skills.analyze ? '(READY)' : '(USED)';
+            document.getElementById('skillFreeze').disabled = !game.skills.freeze || game.mode === 'endless';
+            document.getElementById('skillAnalyze').disabled = !game.skills.analyze;
+        }
+
+        function startGame(mode) {
+            game.mode = mode;
+            game.duration = mode === 'speed60' ? 60 : (mode === 'speed120' ? 120 : 0);
+            game.timeLeft = game.duration;
+            game.score = 0;
+            game.combo = 0;
+            game.maxCombo = 0;
+            game.solvedCount = 0;
+            game.missCount = 0;
+            game.skills = { freeze: true, analyze: true };
+            game.isFrozen = false;
+
+            startFilmCountdown(() => {
+                if (game.mode === 'endless') {
+                    document.getElementById('timerIcon').className = "fa-solid fa-infinity text-emerald-600 text-base";
+                    document.getElementById('gameTimer').innerText = "∞";
+                    document.getElementById('timerUnit').innerText = "MODE";
+                } else {
+                    document.getElementById('timerIcon').className = "fa-regular fa-clock text-slate-500 text-base";
+                    document.getElementById('gameTimer').innerText = game.timeLeft.toFixed(1);
+                    document.getElementById('timerUnit').innerText = "sec";
+                }
+
+                document.getElementById('gameScore').innerText = '0';
+                updateSkillUI();
+                updateStyleRankUI();
+
+                switchView('game');
+                loadNextQuestion();
+
+                if (game.timerId) clearInterval(game.timerId);
+
+                if (game.mode !== 'endless') {
+                    const startTime = Date.now();
+                    let accumulatedPause = 0;
+
+                    game.timerId = setInterval(() => {
+                        if (game.isFrozen) {
+                            accumulatedPause += 100;
+                            return;
+                        }
+                        const elapsed = Date.now() - startTime - accumulatedPause;
+                        const remaining = Math.max(0, (game.duration * 1000 - elapsed) / 1000);
+                        game.timeLeft = remaining;
+                        document.getElementById('gameTimer').innerText = remaining.toFixed(1);
+
+                        updateStyleRankUI();
+
+                        if (remaining <= 0) {
+                            clearInterval(game.timerId);
+                            endGame();
+                        }
+                    }, 100);
+                }
+            });
+        }
+
+        /* Question Generator (Endless Mode Adaptations) */
+        function generateNumber() {
+            if (game.mode === 'endless') {
+                if (game.solvedCount < 5) return getRandomComposite(20, 100, [2, 3, 5, 7]);
+                if (game.solvedCount < 12) return getRandomComposite(100, 400, [2, 3, 5, 7, 11, 13]);
+                if (game.solvedCount < 25) return getRandomComposite(300, 1500, [2, 3, 5, 7, 11, 13, 17, 19]);
+                return getRandomComposite(1000, 10000, [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31]);
+            }
+
+            if (game.mode === 'speed60') {
+                if (game.combo < 3) return getRandomComposite(20, 150, [2, 3, 5, 7]);
+                if (game.combo < 8) return getRandomComposite(120, 500, [2, 3, 5, 7, 11, 13]);
+                return getRandomComposite(300, 1500, [2, 3, 5, 7, 11, 13, 17, 19]);
+            } else {
+                game.questionCount = (game.questionCount || 0) + 1;
+                if (game.questionCount % 5 === 0) {
+                    if (Math.random() < 0.5) {
+                        const primes3Digit = [101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307, 311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 401, 409, 419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467, 479, 487, 491, 499];
+                        return primes3Digit[Math.floor(Math.random() * primes3Digit.length)];
+                    } else {
+                        return getRandomComposite(5000, 100000, [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31]);
+                    }
+                }
+                return getRandomComposite(500, 5000, [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]);
+            }
+        }
+
+        /* Prime Pad Button Click */
+        function pressPrime(p) {
+            if (game.currentVal <= 1) return;
+
+            if (game.currentVal % p === 0) {
+                sound.playStep();
+                game.userFactors.push(p);
+                game.currentVal /= p;
+
+                const rect = document.getElementById('targetNumber').getBoundingClientRect();
+                createBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, '#0f172a', 12);
+
+                renderStepProgress();
+
+                if (game.currentVal === 1) {
+                    handleSuccess();
+                }
+            } else {
+                sound.playWrong();
+                triggerShake();
+                game.missCount++;
+                resetCombo();
+
+                // Endless Mode GameOver on Miss
+                if (game.mode === 'endless') {
+                    setTimeout(() => {
+                        alert('❌ とことんモード：誤答したため挑戦終了！');
+                        endGame();
+                    }, 300);
+                }
+            }
+            updateUndoButton();
+        }
+
+        function declareSelfPrime() {
+            const isTargetPrime = isPrime(game.currentVal);
+            const valToDeclare = game.currentVal;
+
+            if (isTargetPrime) {
+                sound.playCorrect();
+                if (game.currentVal > 1 && game.currentVal !== game.currentOriginal) {
+                    game.userFactors.push(game.currentVal);
+                } else if (game.currentVal === game.currentOriginal) {
+                    game.userFactors.push(game.currentOriginal);
+                }
+                game.currentVal = 1;
+                renderStepProgress();
+
+                const rect = document.getElementById('targetNumber').getBoundingClientRect();
+                createBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, '#0f172a', 20);
+
+                if (valToDeclare >= 100) {
+                    game.primeDeclarations++;
+                    localStorage.setItem('psr_prime_decl', game.primeDeclarations);
+                    triggerPraise("✨ GREAT PRIME!", "bg-amber-500 text-white border-amber-400");
+                }
+
+                handleSuccess();
+            } else {
+                sound.playWrong();
+                triggerShake();
+                game.missCount++;
+                resetCombo();
+
+                if (game.mode === 'endless') {
+                    setTimeout(() => {
+                        alert('❌ とことんモード：誤答したため挑戦終了！');
+                        endGame();
+                    }, 300);
+                }
+            }
+        }
+
+        /* SKILL PERKS */
+        function useSkill(skill) {
+            if (skill === 'freeze' && game.skills.freeze) {
+                if (game.mode === 'endless') return;
+                game.skills.freeze = false;
+                game.isFrozen = true;
+                game.skillUsedCount++;
+                localStorage.setItem('psr_skill_used', game.skillUsedCount);
+                sound.playTone(600, 'sine', 0.15, 0.1);
+                document.getElementById('cdFreeze').innerText = '(USED)';
+                document.getElementById('gameTimer').classList.add('text-slate-400', 'animate-pulse');
+                setTimeout(() => {
+                    game.isFrozen = false;
+                    document.getElementById('gameTimer').classList.remove('text-slate-400', 'animate-pulse');
+                }, 4000);
+            } else if (skill === 'analyze' && game.skills.analyze) {
+                game.skills.analyze = false;
+                game.skillUsedCount++;
+                localStorage.setItem('psr_skill_used', game.skillUsedCount);
+                document.getElementById('cdAnalyze').innerText = '(USED)';
+                const prime = game.targetFactors.find(f => game.currentVal % f === 0);
+                if (prime) {
+                    sound.playTone(700, 'sine', 0.15, 0.1);
+                    alert(`💡【ヒント】 この数は「${prime}」で割り切れます。`);
+                }
+            }
+            updateSkillUI();
+        }
+
+        /* END GAME RESULT */
+        function endGame() {
+            sound.playVictory();
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+
+            const elapsedTime = game.duration > 0 ? game.duration : 60;
+            const fpm = (game.solvedCount / elapsedTime) * 60;
+
+            if (fpm > game.maxFpm) {
+                game.maxFpm = fpm;
+                localStorage.setItem('psr_max_fpm', game.maxFpm.toString());
+            }
+
+            if (game.missCount === 0 && game.solvedCount >= 5 && game.mode !== 'endless') {
+                game.noMissRuns++;
+                localStorage.setItem('psr_nomiss_runs', game.noMissRuns);
+            }
+
+            if (game.mode === 'speed60' && game.score > game.best60) {
+                game.best60 = game.score;
+                localStorage.setItem('psr_best60', game.best60);
+            } else if (game.mode === 'speed120' && game.score > game.best120) {
+                game.best120 = game.score;
+                localStorage.setItem('psr_best120', game.best120);
+            } else if (game.mode === 'endless' && game.solvedCount > game.bestEndless) {
+                game.bestEndless = game.solvedCount;
+                localStorage.setItem('psr_best_endless', game.bestEndless);
+            }
+
+            let finalRank = 'C';
+            if (fpm >= 18) finalRank = 'S+';
+            else if (fpm >= 14) finalRank = 'S';
+            else if (fpm >= 10) finalRank = 'A';
+            else if (fpm >= 6) finalRank = 'B';
+
+            const badge = document.getElementById('resultRankBadge');
+            badge.innerText = finalRank;
+
+            document.getElementById('resSolved').innerText = `${game.solvedCount} 問`;
+            document.getElementById('resMaxCombo').innerText = `${game.maxCombo} COMBO`;
+            document.getElementById('resFpm').innerText = game.mode === 'endless' ? '---' : `${fpm.toFixed(1)} / min`;
+            document.getElementById('resFinalScore').innerText = `${game.score.toLocaleString()} Pts`;
+
+            switchView('result');
+        }
+
+        function restartCurrentGame() {
+            startGame(game.mode);
+        }
+
+        function openTipsModal() { document.getElementById('tipsModal').classList.remove('hidden'); }
+        function closeTipsModal() { document.getElementById('tipsModal').classList.add('hidden'); }
+    </script>
+</body>
+</html>
