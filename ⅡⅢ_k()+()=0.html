@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>k()+()=0のカタチをとらえる</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: #f4f6f9;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 12px;
+    }
+
+    header {
+      width: 100%;
+      max-width: 800px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+
+    p.subtitle {
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+
+    .main-container {
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Canvas Card */
+    .canvas-card {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    #graphCanvas {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1 / 1;
+      max-height: 480px;
+      border-radius: 8px;
+      background-color: #ffffff;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #graphCanvas:active {
+      cursor: grabbing;
+    }
+
+    .canvas-controls-hint {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-top: 4px;
+      text-align: center;
+    }
+
+    /* Equation Display */
+    .equation-card {
+      background: #334155;
+      color: #f8fafc;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-family: "Courier New", Courier, monospace;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-align: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      word-break: break-all;
+    }
+
+    .equation-card span.highlight {
+      color: #38bdf8;
+    }
+    .equation-card span.k-val {
+      color: #4ade80;
+      font-size: 1.1em;
+    }
+
+    /* Control Panel */
+    .control-panel {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #475569;
+    }
+
+    select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background-color: #f8fafc;
+      font-size: 0.9rem;
+      color: #1e293b;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus {
+      border-color: #0284c7;
+      background-color: #ffffff;
+    }
+
+    /* Radio Group (k Position Selector) */
+    .radio-group {
+      display: flex;
+      gap: 12px;
+      background: #f1f5f9;
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+
+    .radio-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+    }
+
+    .radio-label input[type="radio"] {
+      accent-color: #0284c7;
+      cursor: pointer;
+    }
+
+    /* Slider Container */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      height: 8px;
+      border-radius: 4px;
+      background: #e2e8f0;
+      outline: none;
+      accent-color: #16a34a;
+    }
+
+    .k-display {
+      min-width: 65px;
+      text-align: right;
+      font-weight: bold;
+      font-size: 1.1rem;
+      color: #16a34a;
+    }
+
+    /* Buttons */
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 10px 4px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background-color: #2563eb;
+      color: white;
+    }
+    .btn-primary:hover { background-color: #1d4ed8; }
+
+    .btn-secondary {
+      background-color: #e2e8f0;
+      color: #334155;
+    }
+    .btn-secondary:hover { background-color: #cbd5e1; }
+
+    /* Explanation Section */
+    .info-card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      margin-top: 4px;
+    }
+
+    .info-card h2 {
+      font-size: 1rem;
+      color: #0f172a;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 4px;
+    }
+
+    .info-card p, .info-card li {
+      font-size: 0.85rem;
+      color: #475569;
+      line-height: 1.5;
+    }
+
+    .info-card ul {
+      padding-left: 18px;
+      margin-top: 6px;
+    }
+
+    .info-card .tag {
+      display: inline-block;
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    @media (max-width: 480px) {
+      .btn {
+        font-size: 0.75rem;
+        padding: 8px 2px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>k()+()=0のカタチをとらえるシミュレーター</h1>
+    <p class="subtitle">図形群・束（Pencil of Curves）をながめる</p>
+  </header>
+
+  <div class="main-container">
+
+    <!-- Canvas Card -->
+    <div class="canvas-card">
+      <canvas id="graphCanvas"></canvas>
+      <div class="canvas-controls-hint">ドラッグで移動 | ホイール/ピンチで拡大縮小</div>
+    </div>
+
+    <!-- Dynamic Equation Display -->
+    <div class="equation-card" id="equationDisplay"></div>
+
+    <!-- Control Panel -->
+    <div class="control-panel">
+      
+      <!-- Preset Selector -->
+      <div class="control-group">
+        <label for="modeSelect">図形の組み合わせ（定番 / おためし / マニア用）</label>
+        <select id="modeSelect">
+          <optgroup label="【定番】">
+            <option value="line_line">1. 2直線： x + y - 2 = 0 / x - y = 0</option>
+            <option value="circle_circle" selected>2. 2円： x² + y² - 4 = 0 / x² + y² - 4x - 2y + 1 = 0</option>
+            <option value="line_circle">3. 直線と円： x - y + 1 = 0 / x² + y² - 9 = 0</option>
+            <option value="parabola_line">4. 放物線と直線： y - x² = 0 / x + y - 2 = 0</option>
+            <option value="parabola_parabola">5. 2つの放物線： y - x² = 0 / y - (2 - x²) = 0</option>
+          </optgroup>
+          <optgroup label="【おためし】">
+            <option value="ellipse_hyperbola">6. 楕円と双曲線： x²/9 + y²/4 - 1 = 0 / x²/4 - y²/9 - 1 = 0</option>
+            <option value="trig">7. 三角関数： y - sin(x) = 0 / y - cos(x) = 0</option>
+            <option value="exp_log">8. 指数・対数： y - eˣ = 0 / y - ln(x+2) = 0</option>
+            <option value="cubic_line">9. 3次関数と放物線： y - (x³ - 3x) = 0 / y - x² = 0</option>
+            <option value="circle_ellipse">10. 円と楕円： x² + y² - 4 = 0 / x²/9 + y²/4 - 1 = 0</option>
+          </optgroup>
+          <optgroup label="【マニア用】">
+            <option value="astroid_circle">11. ４乗和と円： x⁴ + y⁴ - 4 = 0 / x² + y² - 3 = 0</option>
+            <option value="lemniscate">12. 双極構造： (x² + y²)² - 4(x² - y²) = 0 / x² + y² - 2 = 0</option>
+            <option value="damped_wave">13. 減衰振動波： y - e⁻⁽ˣ/²⁾cos(2x) = 0 / y = 0</option>
+            <option value="folium">14. デカルトの葉と直線： x³ + y³ - 3xy = 0 / x + y = 0</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <!-- k Attachment Position Selection -->
+      <div class="control-group">
+        <label>kを置く場所</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="kPos" value="A" checked> k(A) + B = 0 （k → ±20 で A=0 に接近）
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="kPos" value="B"> A + k(B) = 0 （k → ±20 で B=0 に接近）
+          </label>
+        </div>
+      </div>
+
+      <!-- Slider k -->
+      <div class="control-group">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label for="kSlider"> k の値（-20.0 ～ 20.0）</label>
+          <span class="k-display" id="kValueText">k = 1.0</span>
+        </div>
+        <div class="slider-row">
+          <input type="range" id="kSlider" min="-20" max="20" step="0.1" value="1.0">
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="button-grid">
+        <button class="btn btn-primary" id="playBtn">▶ 再生 / 停止</button>
+        <button class="btn btn-secondary" id="kZeroBtn">k = 0</button>
+        <button class="btn btn-secondary" id="resetViewBtn">位置リセット</button>
+      </div>
+
+    </div>
+
+    <!-- Explanation -->
+    <div class="info-card">
+      <span class="tag">ポイント</span>
+      <h2>kを置く場所と表現できる図形</h2>
+      <p>
+        方程式 <b>k(A) + B = 0</b> は、交点を通る図形群のうち <b>「A = 0 だけは表現できない」</b> という性質があります（k をどんな値にしても完全には A=0 に重ねられないため）。
+      </p>
+      <ul>
+        <li><b>k(A) + B = 0：</b> k = 0 のとき <b>B = 0</b> に完全一致。k を大きくすると <b>A = 0</b> に近づく。</li>
+        <li><b>A + k(B) = 0：</b> k = 0 のとき <b>A = 0</b> に完全一致。k を大きくすると <b>B = 0</b> に近づく。</li>
+      </ul>
+      <p style="margin-top:6px;">
+        ラジオボタンで k の位置を切り替えることで、どちらの図形が「再現できない例外」になるかを視覚的に実験できます。
+      </p>
+    </div>
+
+  </div>
+
+  <script>
+    // --- Canvas & Context Setup ---
+    const canvas = document.getElementById('graphCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // UI Elements
+    const kSlider = document.getElementById('kSlider');
+    const kValueText = document.getElementById('kValueText');
+    const modeSelect = document.getElementById('modeSelect');
+    const equationDisplay = document.getElementById('equationDisplay');
+    const playBtn = document.getElementById('playBtn');
+    const kZeroBtn = document.getElementById('kZeroBtn');
+    const resetViewBtn = document.getElementById('resetViewBtn');
+    const kPosRadios = document.getElementsByName('kPos');
+
+    // State Variables
+    let k = 1.0;
+    let kPosition = "A"; // "A" or "B"
+    let isPlaying = false;
+    let animationFrameId = null;
+    let playDirection = 1;
+
+    // View Transform
+    let scale = 40;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    // Canvas Size / High-DPI (Retina) Support
+    let dpr = window.devicePixelRatio || 1;
+    let width = 0;
+    let height = 0;
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      width = rect.width;
+      height = rect.height;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.scale(dpr, dpr);
+      draw();
+    }
+
+    // --- Presets Definition (Math II, Math III, Mania) ---
+    const presets = {
+      // 定番
+      line_line: {
+        A_text: "x + y - 2",
+        B_text: "x - y",
+        fA: (x, y) => x + y - 2,
+        fB: (x, y) => x - y,
+        intersections: [{x: 1, y: 1}]
+      },
+      circle_circle: {
+        A_text: "x² + y² - 4",
+        B_text: "x² + y² - 4x - 2y + 1",
+        fA: (x, y) => x*x + y*y - 4,
+        fB: (x, y) => x*x + y*y - 4*x - 2*y + 1,
+        intersections: [
+          {x: (10 + Math.sqrt(55))/10, y: (5 - 4*(10 + Math.sqrt(55))/10)/2},
+          {x: (10 - Math.sqrt(55))/10, y: (5 - 4*(10 - Math.sqrt(55))/10)/2}
+        ]
+      },
+      line_circle: {
+        A_text: "x - y + 1",
+        B_text: "x² + y² - 9",
+        fA: (x, y) => x - y + 1,
+        fB: (x, y) => x*x + y*y - 9,
+        intersections: [
+          {x: (-1 + Math.sqrt(17))/2, y: (-1 + Math.sqrt(17))/2 + 1},
+          {x: (-1 - Math.sqrt(17))/2, y: (-1 - Math.sqrt(17))/2 + 1}
+        ]
+      },
+      parabola_line: {
+        A_text: "y - x²",
+        B_text: "x + y - 2",
+        fA: (x, y) => y - x*x,
+        fB: (x, y) => x + y - 2,
+        intersections: [
+          {x: 1, y: 1},
+          {x: -2, y: 4}
+        ]
+      },
+      parabola_parabola: {
+        A_text: "y - x²",
+        B_text: "y - (2 - x²)",
+        fA: (x, y) => y - x*x,
+        fB: (x, y) => y - (2 - x*x),
+        intersections: [
+          {x: 1, y: 1},
+          {x: -1, y: 1}
+        ]
+      },
+
+      // おためし
+      ellipse_hyperbola: {
+        A_text: "x²/9 + y²/4 - 1",
+        B_text: "x²/4 - y²/9 - 1",
+        fA: (x, y) => (x*x)/9 + (y*y)/4 - 1,
+        fB: (x, y) => (x*x)/4 - (y*y)/9 - 1,
+        intersections: [
+          {x:  Math.sqrt(72/13), y:  Math.sqrt(20/13)},
+          {x: -Math.sqrt(72/13), y:  Math.sqrt(20/13)},
+          {x:  Math.sqrt(72/13), y: -Math.sqrt(20/13)},
+          {x: -Math.sqrt(72/13), y: -Math.sqrt(20/13)}
+        ]
+      },
+      trig: {
+        A_text: "y - sin(x)",
+        B_text: "y - cos(x)",
+        fA: (x, y) => y - Math.sin(x),
+        fB: (x, y) => y - Math.cos(x),
+        intersections: [
+          {x: Math.PI/4, y: Math.SQRT1_2},
+          {x: 5*Math.PI/4, y: -Math.SQRT1_2},
+          {x: -3*Math.PI/4, y: -Math.SQRT1_2},
+          {x: -7*Math.PI/4, y: Math.SQRT1_2}
+        ]
+      },
+      exp_log: {
+        A_text: "y - eˣ",
+        B_text: "y - ln(x + 2)",
+        fA: (x, y) => y - Math.exp(x),
+        fB: (x, y) => (x > -2) ? y - Math.log(x + 2) : 1e5,
+        intersections: [
+          {x: -0.842, y: 0.431},
+          {x: 0.438, y: 1.550}
+        ]
+      },
+      cubic_line: {
+        A_text: "y - (x³ - 3x)",
+        B_text: "y - x²",
+        fA: (x, y) => y - (x*x*x - 3*x),
+        fB: (x, y) => y - x*x,
+        intersections: [
+          {x: 0, y: 0},
+          {x: (1 + Math.sqrt(13))/2, y: Math.pow((1 + Math.sqrt(13))/2, 2)},
+          {x: (1 - Math.sqrt(13))/2, y: Math.pow((1 - Math.sqrt(13))/2, 2)}
+        ]
+      },
+      circle_ellipse: {
+        A_text: "x² + y² - 4",
+        B_text: "x²/9 + y²/4 - 1",
+        fA: (x, y) => x*x + y*y - 4,
+        fB: (x, y) => (x*x)/9 + (y*y)/4 - 1,
+        intersections: [
+          {x: 0, y: 2},
+          {x: 0, y: -2}
+        ]
+      },
+
+      // マニア用
+      astroid_circle: {
+        A_text: "x⁴ + y⁴ - 4",
+        B_text: "x² + y² - 3",
+        fA: (x, y) => Math.pow(x, 4) + Math.pow(y, 4) - 4,
+        fB: (x, y) => x*x + y*y - 3,
+        intersections: [
+          {x:  Math.sqrt(1.5), y:  Math.sqrt(1.5)},
+          {x: -Math.sqrt(1.5), y:  Math.sqrt(1.5)},
+          {x:  Math.sqrt(1.5), y: -Math.sqrt(1.5)},
+          {x: -Math.sqrt(1.5), y: -Math.sqrt(1.5)}
+        ]
+      },
+      lemniscate: {
+        A_text: "(x² + y²)² - 4(x² - y²)",
+        B_text: "x² + y² - 2",
+        fA: (x, y) => Math.pow(x*x + y*y, 2) - 4*(x*x - y*y),
+        fB: (x, y) => x*x + y*y - 2,
+        intersections: [
+          {x:  Math.sqrt(1.5), y:  Math.sqrt(0.5)},
+          {x: -Math.sqrt(1.5), y:  Math.sqrt(0.5)},
+          {x:  Math.sqrt(1.5), y: -Math.sqrt(0.5)},
+          {x: -Math.sqrt(1.5), y: -Math.sqrt(0.5)}
+        ]
+      },
+      damped_wave: {
+        A_text: "y - e⁻⁽ˣ/²⁾cos(2x)",
+        B_text: "y",
+        fA: (x, y) => y - Math.exp(-x/2) * Math.cos(2*x),
+        fB: (x, y) => y,
+        intersections: [
+          {x: Math.PI/4, y: 0},
+          {x: 3*Math.PI/4, y: 0},
+          {x: 5*Math.PI/4, y: 0},
+          {x: -Math.PI/4, y: 0},
+          {x: -3*Math.PI/4, y: 0}
+        ]
+      },
+      folium: {
+        A_text: "x³ + y³ - 3xy",
+        B_text: "x + y",
+        fA: (x, y) => x*x*x + y*y*y - 3*x*y,
+        fB: (x, y) => x + y,
+        intersections: [
+          {x: 0, y: 0},
+          {x: 1.5, y: -1.5}
+        ]
+      }
+    };
+
+    let currentMode = "circle_circle";
+
+    // Coordinate Translation
+    function toScreenX(x) { return width / 2 + offsetX + x * scale; }
+    function toScreenY(y) { return height / 2 + offsetY - y * scale; }
+    function toMathX(px) { return (px - width / 2 - offsetX) / scale; }
+    function toMathY(py) { return (height / 2 + offsetY - py) / scale; }
+
+    // Update Equation Text Display
+    function updateEquationText() {
+      const p = presets[currentMode];
+      const kStr = k.toFixed(1);
+      
+      let generalHtml = "";
+      let substitutedHtml = "";
+
+      if (kPosition === "A") {
+        generalHtml = `<div><span class="highlight">k</span>(${p.A_text}) + (${p.B_text}) = 0</div>`;
+        substitutedHtml = `<span class="k-val">${kStr}</span>(${p.A_text}) + (${p.B_text}) = 0`;
+      } else {
+        generalHtml = `<div>(${p.A_text}) + <span class="highlight">k</span>(${p.B_text}) = 0</div>`;
+        substitutedHtml = `(${p.A_text}) + <span class="k-val">${kStr}</span>(${p.B_text}) = 0`;
+      }
+
+      equationDisplay.innerHTML = `${generalHtml}<div style="margin-top:4px; font-size:0.85rem; color:#cbd5e1;">${substitutedHtml}</div>`;
+    }
+
+    // Grid Renderer
+    function drawGrid() {
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#e2e8f0";
+
+      const minX = Math.floor(toMathX(0));
+      const maxX = Math.ceil(toMathX(width));
+      const minY = Math.floor(toMathY(height));
+      const maxY = Math.ceil(toMathY(0));
+
+      ctx.beginPath();
+      for (let x = minX; x <= maxX; x++) {
+        const sx = toScreenX(x);
+        ctx.moveTo(sx, 0); ctx.lineTo(sx, height);
+      }
+      for (let y = minY; y <= maxY; y++) {
+        const sy = toScreenY(y);
+        ctx.moveTo(0, sy); ctx.lineTo(width, sy);
+      }
+      ctx.stroke();
+
+      // Main Axes
+      ctx.beginPath();
+      const originX = toScreenX(0);
+      const originY = toScreenY(0);
+
+      ctx.moveTo(0, originY); ctx.lineTo(width, originY);
+      ctx.moveTo(originX, 0); ctx.lineTo(originX, height);
+      
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Axis Labels & Ticks
+      ctx.fillStyle = "#64748b";
+      ctx.font = "11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      for (let x = minX; x <= maxX; x++) {
+        if (x !== 0 && x % 2 === 0) ctx.fillText(x.toString(), toScreenX(x), originY + 4);
+      }
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      for (let y = minY; y <= maxY; y++) {
+        if (y !== 0 && y % 2 === 0) ctx.fillText(y.toString(), originX - 4, toScreenY(y));
+      }
+    }
+
+    // Marching Squares Algorithm for Contours
+    function drawImplicitCurve(func, color, lineWidth, isDashed = false) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.setLineDash(isDashed ? [4, 4] : []);
+
+      const step = 4;
+      const rows = Math.ceil(height / step);
+      const cols = Math.ceil(width / step);
+
+      const grid = new Float32Array((cols + 1) * (rows + 1));
+      for (let r = 0; r <= rows; r++) {
+        const my = toMathY(r * step);
+        for (let c = 0; c <= cols; c++) {
+          grid[r * (cols + 1) + c] = func(toMathX(c * step), my);
+        }
+      }
+
+      ctx.beginPath();
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const idx = r * (cols + 1) + c;
+          const v0 = grid[idx], v1 = grid[idx + 1];
+          const v2 = grid[idx + (cols + 1) + 1], v3 = grid[idx + (cols + 1)];
+
+          let cellCode = 0;
+          if (v0 > 0) cellCode |= 1;
+          if (v1 > 0) cellCode |= 2;
+          if (v2 > 0) cellCode |= 4;
+          if (v3 > 0) cellCode |= 8;
+
+          if (cellCode === 0 || cellCode === 15) continue;
+
+          const x0 = c * step, y0 = r * step;
+          const x1 = x0 + step, y1 = y0 + step;
+
+          const top = [x0 + (step * (-v0)) / (v1 - v0), y0];
+          const right = [x1, y0 + (step * (-v1)) / (v2 - v1)];
+          const bottom = [x0 + (step * (-v3)) / (v2 - v3), y1];
+          const left = [x0, y0 + (step * (-v0)) / (v3 - v0)];
+
+          switch (cellCode) {
+            case 1: case 14: line(left, top); break;
+            case 2: case 13: line(top, right); break;
+            case 3: case 12: line(left, right); break;
+            case 4: case 11: line(right, bottom); break;
+            case 5: line(left, top); line(right, bottom); break;
+            case 6: case 9:  line(top, bottom); break;
+            case 7: case 8:  line(left, bottom); break;
+            case 10: line(top, right); line(left, bottom); break;
+          }
+        }
+      }
+
+      ctx.stroke();
+      ctx.restore();
+
+      function line(p1, p2) {
+        ctx.moveTo(p1[0], p1[1]);
+        ctx.lineTo(p2[0], p2[1]);
+      }
+    }
+
+    function drawIntersections(pts) {
+      if (!pts) return;
+      pts.forEach(pt => {
+        const sx = toScreenX(pt.x);
+        const sy = toScreenY(pt.y);
+
+        if (sx >= -10 && sx <= width + 10 && sy >= -10 && sy <= height + 10) {
+          ctx.beginPath();
+          ctx.arc(sx, sy, 7, 0, Math.PI * 2);
+          ctx.fillStyle = "#eab308";
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#000000";
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = "#ffffff";
+          ctx.fill();
+        }
+      });
+    }
+
+    // Main Draw Execution
+    function draw() {
+      ctx.clearRect(0, 0, width, height);
+
+      drawGrid();
+
+      const p = presets[currentMode];
+
+      // 1. Base Graph A = 0 (Blue Dashed)
+      drawImplicitCurve(p.fA, "#2563eb", 2, true);
+
+      // 2. Base Graph B = 0 (Red Dashed)
+      drawImplicitCurve(p.fB, "#dc2626", 2, true);
+
+      // 3. Dynamic Curve (Green Solid)
+      const fCombined = (x, y) => {
+        return kPosition === "A" 
+          ? k * p.fA(x, y) + p.fB(x, y)
+          : p.fA(x, y) + k * p.fB(x, y);
+      };
+      drawImplicitCurve(fCombined, "#16a34a", 3.5, false);
+
+      // 4. Fixed Intersections
+      drawIntersections(p.intersections);
+    }
+
+    // --- Animation Logic (Slower Speed) ---
+    function updateAnimation() {
+      if (!isPlaying) return;
+
+      // Slower animation increment (0.03 instead of 0.1)
+      k += 0.03 * playDirection;
+
+      if (k >= 20.0) {
+        k = 20.0;
+        playDirection = -1;
+      } else if (k <= -20.0) {
+        k = -20.0;
+        playDirection = 1;
+      }
+
+      kSlider.value = k.toFixed(1);
+      kValueText.textContent = `k = ${k.toFixed(1)}`;
+      updateEquationText();
+      draw();
+
+      animationFrameId = requestAnimationFrame(updateAnimation);
+    }
+
+    // --- Event Handlers ---
+
+    // Radio button handler for k position
+    kPosRadios.forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        kPosition = e.target.value;
+        updateEquationText();
+        draw();
+      });
+    });
+
+    // Slider
+    kSlider.addEventListener('input', (e) => {
+      k = parseFloat(e.target.value);
+      kValueText.textContent = `k = ${k.toFixed(1)}`;
+      updateEquationText();
+      draw();
+    });
+
+    // Mode Selector
+    modeSelect.addEventListener('change', (e) => {
+      currentMode = e.target.value;
+      updateEquationText();
+      draw();
+    });
+
+    // Buttons
+    playBtn.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      if (isPlaying) {
+        playBtn.textContent = "⏸ 停止";
+        playBtn.style.backgroundColor = "#dc2626";
+        updateAnimation();
+      } else {
+        playBtn.textContent = "▶ 再生 / 停止";
+        playBtn.style.backgroundColor = "#2563eb";
+        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      }
+    });
+
+    kZeroBtn.addEventListener('click', () => {
+      k = 0.0;
+      kSlider.value = 0.0;
+      kValueText.textContent = "k = 0.0";
+      updateEquationText();
+      draw();
+    });
+
+    resetViewBtn.addEventListener('click', () => {
+      scale = 40;
+      offsetX = 0;
+      offsetY = 0;
+      draw();
+    });
+
+    // Touch & Mouse Drag / Zooming
+    let isDragging = false;
+    let startX = 0, startY = 0;
+
+    canvas.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startX = e.clientX - offsetX;
+      startY = e.clientY - offsetY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      offsetX = e.clientX - startX;
+      offsetY = e.clientY - startY;
+      draw();
+    });
+
+    window.addEventListener('mouseup', () => { isDragging = false; });
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+      scale = Math.max(10, Math.min(200, scale * zoomFactor));
+      draw();
+    }, { passive: false });
+
+    // Initialization
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    updateEquationText();
+
+  </script>
+</body>
+</html>
